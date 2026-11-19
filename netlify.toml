@@ -1,0 +1,4 @@
+[build]
+  # The site is already static; no dependency installation or compilation is needed.
+  command = ""
+  publish = "WebSite_ProjectRnP"
