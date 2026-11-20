@@ -10,17 +10,36 @@ Project R&P Cilacap. PROJIC menjadi pintu masuk aplikasi internal, saat ini:
 Portal juga menampilkan waktu live WIB, informasi cuaca dari API BMKG, dan
 prakiraan tiga hari.
 
-## Akun e-MIRA
+## Akun dan penyimpanan cloud e-MIRA
+
+e-MIRA memakai **Supabase** untuk autentikasi dan penyimpanan data. Login tetap
+memakai **username + password**; di balik layar username dipetakan ke email
+internal `username@emira.local`.
 
 Saat membuat akun baru, kolom yang wajib diisi adalah **Nama Lengkap**,
 **Username**, **Password**, dan **Nomor HP/WhatsApp**. Email bersifat opsional.
-Saat mengedit akun, password boleh dikosongkan bila tidak diubah. Email pada
-data pekerja juga bersifat opsional. Email pada Profil Admin di Pusat Data
-tetap wajib karena dipakai sebagai pengirim/Reply-To notifikasi.
+Password hanya diisi saat akun dibuat. Setelah itu pengguna dapat menggantinya
+melalui **Akun Saya**. Admin dapat menambah akun **User**; edit, nonaktifkan,
+dan pengelolaan tipe akun tetap hanya untuk Super User.
 
-Admin dapat membuka menu **Akun** dan menambah akun bertipe **User**. Edit,
-hapus, reset password, dan pengelolaan tipe akun tetap hanya untuk Super User.
-Admin juga tidak dapat mengakses menu Fungsi.
+Data e-MIRA disimpan pada tabel `app_state` di Supabase dan disinkronkan ke
+semua perangkat. Perubahan dari perangkat lain diterima secara real-time.
+`localStorage` hanya dipakai sebagai cache/fallback lokal.
+
+Versi cloud ditandai **e-MIRA V.2.0 · Cloud** pada footer login, sidebar, dan
+footer aplikasi. Jika perangkat masih menampilkan **V.1.0**, browser masih
+memuat berkas lama dan akun baru akan tersimpan lokal, bukan ke Supabase.
+
+- Pada login pertama dari perangkat yang masih memiliki data lama, data lokal
+  dan data cloud digabungkan agar pemesanan lama tidak hilang.
+- Akun lama yang sebelumnya hanya tersimpan di `localStorage` tidak dapat
+  dipindahkan password-nya. Akun tersebut perlu dibuat ulang melalui Supabase.
+- Penghapusan akun di aplikasi berarti **menonaktifkan** akun. User Auth tetap
+  ada dan dapat dihapus manual melalui Dashboard Supabase.
+- Pengaturan gateway notifikasi dan token masih tersimpan lokal per perangkat,
+  belum disinkronkan ke cloud.
+- `app_state` dapat ditulis oleh semua user aktif. Pembatasan tombol dan role
+  tetap dilakukan di aplikasi; model ini cocok untuk tim internal tepercaya.
 
 User dapat membuat pemesanan ruang rapat dan membatalkan pemesanan miliknya
 sendiri. User tidak dapat mengubah atau menghapus pemesanan, mengirim
@@ -41,8 +60,9 @@ python3 -m http.server 8080
 
 Lalu buka `http://localhost:8080`.
 
-> Sebagian besar aset dan aplikasi tersimpan lokal. Informasi cuaca memerlukan
-> koneksi internet karena dimuat dari API BMKG.
+> Login e-MIRA, data cloud, dan informasi cuaca memerlukan koneksi internet.
+> Gunakan server HTTP/HTTPS (bukan `file://`) agar autentikasi Supabase bekerja
+> dengan baik.
 
 ## Struktur repositori
 
@@ -57,9 +77,14 @@ Lalu buka `http://localhost:8080`.
 ├── apps/
 │   ├── README.md
 │   ├── e-mira/
-│   │   └── index.html       # e-MIRA — satu berkas mandiri
+│   │   ├── index.html        # e-MIRA
+│   │   └── supabase-config.js # URL + publishable key Supabase
 │   └── tracking-perizinan-grc/
-│       └── index.html       # Tracking Perizinan GRC — satu berkas mandiri
+│       └── index.html        # Tracking Perizinan GRC — satu berkas mandiri
+├── supabase/
+│   ├── setup.sql             # skema, RLS, trigger, invite
+│   ├── grants.sql            # grant untuk role authenticated
+│   └── README.md             # panduan setup Supabase
 ├── docs/
 │   ├── preview-desktop.jpg
 │   └── preview-full.jpg
@@ -74,6 +99,8 @@ Lalu buka `http://localhost:8080`.
     ├── js/
     │   ├── apps.js          # daftar aplikasi
     │   └── main.js          # render direktori, jam, cuaca, dialog
+    ├── vendor/
+    │   └── supabase.js      # pustaka Supabase JS (vendored)
     └── logos/
         ├── pertamina.svg
         ├── danantara-main.png
