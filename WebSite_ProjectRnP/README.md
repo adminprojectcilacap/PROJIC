@@ -34,6 +34,7 @@ Lalu buka `http://localhost:8080`.
 .
 ├── index.html
 ├── README.md
+├── netlify.toml
 ├── robots.txt
 ├── .gitignore
 ├── .nojekyll
@@ -132,6 +133,45 @@ berada pada elemen `.wx-link` di `index.html`.
   langsung dari `file://`.
 - Jam live WIB ditampilkan besar pada kartu cuaca dan tetap tersedia pada
   header.
+
+## Publikasi ke Netlify
+
+Repositori ini sudah menyertakan `netlify.toml` di root dengan konfigurasi situs
+statis:
+
+```toml
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+```
+
+Di Netlify, buka **Site configuration → Build & deploy → Build settings**, lalu
+pastikan:
+
+| Pengaturan | Nilai |
+|---|---|
+| Base directory | kosong (jika `index.html` ada di root repo) |
+| Build command | kosong |
+| Publish directory | `.` |
+| Production branch | branch utama repo, misalnya `main` |
+
+Jika seluruh isi proyek berada di subfolder repo (misalnya
+`WebSite_ProjectRnP/`), isi **Base directory** dengan nama folder tersebut dan
+publish directory tetap `.`.
+
+### Jika Deploy Preview tampil tetapi URL live “Page Not Found”
+
+1. Buka **Deploys** dan pastikan deploy terbaru berstatus **Published** pada
+   konteks **Production**, bukan hanya **Deploy Preview**.
+2. Cocokkan **Production branch** di Netlify dengan branch utama GitHub
+   (`main` atau `master`).
+3. Pastikan `index.html` berada di root repo, bukan di dalam folder tambahan.
+4. Pastikan **Publish directory** mengarah ke folder yang berisi `index.html`.
+5. Setelah mengubah build settings, jalankan **Trigger deploy → Deploy site**.
 
 ## Publikasi ke GitHub Pages
 
