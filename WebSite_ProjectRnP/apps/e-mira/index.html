@@ -7965,7 +7965,7 @@ body[data-role="user"] [data-worker-create] {
     </div>
     <footer class="login-footer">
       <span>© 2026 PT Pertamina Patra Niaga · Fungsi R &amp; P Cilacap</span>
-      <span>e-MIRA V.2.2 · Cloud</span>
+      <span>e-MIRA V.1.0 · Cloud</span>
     </footer>
   </div>
 
@@ -7982,7 +7982,7 @@ body[data-role="user"] [data-worker-create] {
         <div class="app-identity">
           <div class="app-identity-row">
             <span class="app-name">e-MIRA</span>
-            <span class="app-version">V.2.2 · Cloud</span>
+            <span class="app-version">V.1.0 · Cloud</span>
           </div>
           <span class="app-desc">e-lektronik Manajemen Informasi Ruang &amp; Agenda</span>
         </div>
@@ -8565,7 +8565,7 @@ body[data-role="user"] [data-worker-create] {
             <div class="page-actions">
               <button class="btn btn-outline-danger" id="deleteAllUsersBtn" data-superuser-only>
                 <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg>
-                Nonaktifkan Semua Akun Lain
+                Hapus Semua Akun Lain
               </button>
               <button class="btn btn-primary" id="addUserBtn" data-account-manager>
                 <svg class="icon" aria-hidden="true"><use href="#i-user-plus"></use></svg>
@@ -8586,7 +8586,7 @@ body[data-role="user"] [data-worker-create] {
             <div class="worker-bulk-bar" id="userBulkBar" hidden>
               <span id="userSelectedCount">0 akun dipilih</span>
               <div class="worker-bulk-actions">
-                <button type="button" class="btn btn-outline-danger btn-sm" id="deleteSelectedUsersBtn">Nonaktifkan Terpilih</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" id="deleteSelectedUsersBtn">Hapus Terpilih</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="clearUserSelectionBtn">Batal</button>
               </div>
             </div>
@@ -8654,7 +8654,7 @@ body[data-role="user"] [data-worker-create] {
       <footer class="app-footer">
         <span>© <span id="footerYear">2026</span> PT Pertamina Patra Niaga — Fungsi R &amp; P Cilacap</span>
         <span class="footer-sep">·</span>
-        <span>e-MIRA V.2.2 · Cloud</span>
+        <span>e-MIRA V.1.0 · Cloud</span>
       </footer>
     </div>
   </div>
@@ -9655,14 +9655,14 @@ body[data-role="user"] [data-worker-create] {
     <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 21V9m0 0-5 5m5-5 5 5M5 3h14"/></symbol>
   </svg>
 
-  <script src="../../assets/vendor/supabase.js?v=2.2.0"></script>
+  <script src="../../assets/vendor/supabase.js?v=1.0.0-cloud"></script>
   <script>
     /* Fallback CDN: tetap berfungsi bila folder vendor belum ikut terunggah. */
     if (!window.supabase?.createClient) {
       document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>');
     }
   </script>
-  <script src="supabase-config.js?v=2.2.0"></script>
+  <script src="supabase-config.js?v=1.0.0-cloud"></script>
   <script>
     /* Fallback konfigurasi publik: aplikasi tetap bisa login bila berkas
        supabase-config.js belum terunggah. Kunci publishable aman di frontend
@@ -14462,26 +14462,28 @@ async function handleConfirmAction() {
     state.selectedUserIds = [];
 
     if (!cloud) {
-      showToast('Cloud belum siap', 'Akun tidak dapat dinonaktifkan tanpa koneksi Supabase.', 'error');
+      showToast('Cloud belum siap', 'Akun tidak dapat dihapus tanpa koneksi Supabase.', 'error');
       return;
     }
 
-    const { error } = await cloud
-      .from('profiles')
-      .update({ status: 'inactive' })
-      .in('id', [...ids]);
+    const { data: removed, error } = await cloud.rpc('delete_emira_users', {
+      target_ids: [...ids]
+    });
     if (error) {
-      console.error('e-MIRA: akun tidak dapat dinonaktifkan.', error);
-      showToast('Akun tidak dapat dinonaktifkan', error.message || 'Periksa koneksi lalu coba lagi.', 'error');
+      console.error('e-MIRA: akun tidak dapat dihapus.', error);
+      const hint = /function|schema cache|does not exist/i.test(error.message || '')
+        ? 'Fungsi hapus permanen belum dipasang. Jalankan supabase/delete-account.sql di Supabase.'
+        : (error.message || 'Periksa koneksi lalu coba lagi.');
+      showToast('Akun tidak dapat dihapus', hint, 'error');
       return;
     }
 
-    appUsers = appUsers.map((user) => ids.has(user.id) ? { ...user, status: 'inactive' } : user);
+    appUsers = appUsers.filter((user) => !ids.has(user.id));
     closeModal('confirmModal');
     renderUsers();
     showToast(
-      all ? 'Akun lain dinonaktifkan' : 'Akun dinonaktifkan',
-      `${count} akun tidak dapat login lagi. Akun yang sedang aktif tetap dipertahankan.`,
+      all ? 'Akun lain dihapus' : 'Akun dihapus',
+      `${Number(removed) || count} akun dihapus permanen. Akun yang sedang aktif tetap dipertahankan.`,
       'warning'
     );
     return;
@@ -17663,7 +17665,7 @@ function renderUsers() {
               <td class="align-right">
                 <div class="user-table-actions">
                   <button type="button" class="btn btn-ghost btn-sm" data-edit-user="${esc(user.id)}">Edit</button>
-                  <button type="button" class="btn btn-ghost btn-sm" data-delete-user="${esc(user.id)}" ${isSelf ? 'disabled title="Akun yang sedang aktif tidak dapat dihapus"' : ''}>Nonaktifkan</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-delete-user="${esc(user.id)}" ${isSelf ? 'disabled title="Akun yang sedang aktif tidak dapat dihapus"' : ''}>Hapus</button>
                 </div>
               </td>` : ''}
             </tr>
@@ -17731,10 +17733,10 @@ function askDeleteAccounts(ids, all = false) {
   const text = document.getElementById('confirmText');
   const summary = document.getElementById('confirmSummary');
   const button = document.getElementById('confirmCancelBtn');
-  if (title) title.textContent = all ? 'Nonaktifkan Seluruh Akun Lain?' : 'Nonaktifkan Akun?';
-  if (text) text.textContent = 'Akun yang dinonaktifkan tidak dapat masuk lagi ke e-MIRA. Profil tetap disimpan dan dapat diaktifkan kembali oleh Super User.';
-  if (summary) summary.innerHTML = `<strong>${targets.length} akun akan dinonaktifkan</strong><span>Akun yang sedang aktif tidak termasuk.</span>`;
-  if (button) button.textContent = 'Ya, Nonaktifkan Akun';
+  if (title) title.textContent = all ? 'Hapus Seluruh Akun Lain?' : 'Hapus Akun?';
+  if (text) text.textContent = 'Akun dan profil akan dihapus permanen dari Supabase Auth. Akun yang sedang aktif tidak dapat dihapus.';
+  if (summary) summary.innerHTML = `<strong>${targets.length} akun akan dihapus</strong><span>Akun yang sedang aktif tidak termasuk.</span>`;
+  if (button) button.textContent = 'Ya, Hapus Akun';
   openModal('confirmModal');
 }
 
