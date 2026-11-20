@@ -8029,7 +8029,7 @@ body[data-role="user"] [data-worker-create] {
           <svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg>
           <span>Akun Saya</span>
         </a>
-        <a href="#akun" class="nav-item" data-route="akun" data-superuser-only hidden>
+        <a href="#akun" class="nav-item" data-route="akun" data-account-manager hidden>
           <svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg>
           <span>Akun</span>
         </a>
@@ -8562,14 +8562,14 @@ body[data-role="user"] [data-worker-create] {
                 Kontrol Akses
               </div>
               <h1>Manajemen Akun</h1>
-              <p>Kelola akun Super User, Admin, dan User e-MIRA.</p>
+              <p>Kelola akun Super User, Admin, dan User e-MIRA. Admin dapat menambahkan akun User.</p>
             </div>
             <div class="page-actions">
-              <button class="btn btn-outline-danger" id="deleteAllUsersBtn">
+              <button class="btn btn-outline-danger" id="deleteAllUsersBtn" data-superuser-only>
                 <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg>
                 Hapus Semua Akun Lain
               </button>
-              <button class="btn btn-primary" id="addUserBtn">
+              <button class="btn btn-primary" id="addUserBtn" data-account-manager>
                 <svg class="icon" aria-hidden="true"><use href="#i-user-plus"></use></svg>
                 Tambah Akun
               </button>
@@ -8582,7 +8582,7 @@ body[data-role="user"] [data-worker-create] {
             <div class="card-head">
               <div>
                 <h2>Daftar Akun</h2>
-                <p>Super User dapat mengubah seluruh data; Admin membuat/membatalkan jadwal dan menambah pekerja; User hanya melihat dan mengelola akunnya sendiri.</p>
+                <p>Super User dapat mengubah seluruh data akun; Admin dapat menambah akun User; User hanya melihat dan mengelola akunnya sendiri.</p>
               </div>
             </div>
             <div class="worker-bulk-bar" id="userBulkBar" hidden>
@@ -9285,7 +9285,7 @@ body[data-role="user"] [data-worker-create] {
               <label for="userPosition">Jabatan</label>
               <input type="text" id="userPosition" maxlength="60" placeholder="Contoh: Staf Administrasi" autocomplete="organization-title">
             </div>
-            <div class="field">
+            <div class="field" id="userRoleField">
               <label for="userRole">Tipe akun</label>
               <select id="userRole">
                 <option value="admin">Admin — jadwal & tambah pekerja</option>
@@ -10560,7 +10560,10 @@ function applyRoute() {
     window.history.replaceState(null, '', '#akun');
   }
 
-  if ((route === 'akun' || route === 'fungsi') && !isSuperUser()) {
+  if (
+    (route === 'fungsi' && !isSuperUser()) ||
+    (route === 'akun' && !isSuperUser() && !isAdmin())
+  ) {
     route = 'ringkasan';
     window.history.replaceState(null, '', '#ringkasan');
   }
@@ -16563,20 +16566,27 @@ function showApp() {
 
 function applyRolePermissions() {
   const superUser = isSuperUser();
+  const accountManager = superUser || isAdmin();
   document.querySelectorAll('[data-superuser-only]').forEach((element) => {
     element.hidden = !superUser;
   });
+  document.querySelectorAll('[data-account-manager]').forEach((element) => {
+    element.hidden = !accountManager;
+  });
 
   if (!superUser) {
-    const table = document.getElementById('userTable');
-    const summary = document.getElementById('userSummaryGrid');
     const fungsiTable = document.getElementById('fungsiTable');
-    if (table) table.innerHTML = '';
-    if (summary) summary.innerHTML = '';
     if (fungsiTable) fungsiTable.innerHTML = '';
   }
 
-  if (!superUser && state.route === 'akun') {
+  if (!isAdmin() && !superUser) {
+    const table = document.getElementById('userTable');
+    const summary = document.getElementById('userSummaryGrid');
+    if (table) table.innerHTML = '';
+    if (summary) summary.innerHTML = '';
+  }
+
+  if (!accountManager && state.route === 'akun') {
     if (window.location.hash === '#akun') window.location.hash = '#ringkasan';
     else applyRoute();
   }
@@ -17255,8 +17265,9 @@ async function changeMyPassword(event) {
 function renderUsers() {
   const table = document.getElementById('userTable');
   const summary = document.getElementById('userSummaryGrid');
-  if (!table || !isSuperUser()) return;
+  if (!table || (!isSuperUser() && !isAdmin())) return;
 
+  const superUser = isSuperUser();
   const sorted = [...appUsers].sort((a, b) => {
     if (a.role !== b.role) return a.role === 'superuser' ? -1 : 1;
     return String(a.name).localeCompare(String(b.name));
@@ -17279,14 +17290,14 @@ function renderUsers() {
     <table class="data-table">
       <thead>
         <tr>
-          <th class="worker-check-cell"><input type="checkbox" id="userSelectAll" aria-label="Pilih semua akun lain"></th>
+          ${superUser ? '<th class="worker-check-cell"><input type="checkbox" id="userSelectAll" aria-label="Pilih semua akun lain"></th>' : ''}
           <th>Nama</th>
           <th>Username</th>
-          <th>Password</th>
+          ${superUser ? '<th>Password</th>' : ''}
           <th>Tipe</th>
           <th>Status</th>
           <th>Diperbarui</th>
-          <th class="align-right">Aksi</th>
+          ${superUser ? '<th class="align-right">Aksi</th>' : ''}
         </tr>
       </thead>
       <tbody>
@@ -17294,28 +17305,31 @@ function renderUsers() {
           const isSelf = user.id === currentUser?.id;
           return `
             <tr>
+              ${superUser ? `
               <td class="worker-check-cell">
                 <input type="checkbox" data-select-user="${esc(user.id)}" ${state.selectedUserIds.includes(user.id) ? 'checked' : ''} ${isSelf ? 'disabled title="Akun yang sedang aktif tidak dapat dihapus"' : `aria-label="Pilih ${esc(user.name)}"`}>
-              </td>
+              </td>` : ''}
               <td>
                 <strong>${esc(user.name)}</strong>${isSelf ? ' <span class="field-note">(Anda)</span>' : ''}
                 ${user.email ? `<span class="user-contact">${esc(user.email)}</span>` : ''}
               </td>
               <td>${esc(user.username)}</td>
+              ${superUser ? `
               <td class="password-cell">
                 ${user.passwordVault
                   ? `<span class="password-value" data-password-value="${esc(user.id)}">••••••</span><button type="button" class="password-reveal" data-reveal-password="${esc(user.id)}" title="Tampilkan password" aria-label="Tampilkan password ${esc(user.name)}">${icon('i-eye')}</button>`
                   : '<span class="password-value is-unavailable">Tidak tersedia</span>'}
-              </td>
+              </td>` : ''}
               <td><span class="role-badge is-${user.role}">${esc(roleLabel(user.role))}</span></td>
               <td><span class="user-status is-${user.status}">${user.status === 'active' ? 'Aktif' : 'Nonaktif'}</span></td>
               <td>${esc(formatDateTime(user.updatedAt || user.createdAt))}</td>
+              ${superUser ? `
               <td class="align-right">
                 <div class="user-table-actions">
                   <button type="button" class="btn btn-ghost btn-sm" data-edit-user="${esc(user.id)}">Edit</button>
                   <button type="button" class="btn btn-ghost btn-sm" data-delete-user="${esc(user.id)}" ${isSelf ? 'disabled title="Akun yang sedang aktif tidak dapat dihapus"' : ''}>Hapus</button>
                 </div>
-              </td>
+              </td>` : ''}
             </tr>
           `;
         }).join('')}
@@ -17421,8 +17435,14 @@ async function toggleRevealPassword(userId, button) {
 }
 
 function openUserModal(userId = '') {
-  if (!isSuperUser()) {
-    showToast('Akses terbatas', 'Hanya Super User yang dapat mengelola akun.', 'warning');
+  const superUser = isSuperUser();
+  const canCreate = superUser || isAdmin();
+  if (userId && !superUser) {
+    showToast('Akses terbatas', 'Hanya Super User yang dapat mengubah akun.', 'warning');
+    return;
+  }
+  if (!userId && !canCreate) {
+    showToast('Akses terbatas', 'Anda tidak memiliki akses untuk menambah akun.', 'warning');
     return;
   }
 
@@ -17447,7 +17467,7 @@ function openUserModal(userId = '') {
   setValue('userPhone', user?.phone || '');
   setValue('userUnit', user?.unit || getFungsiOptions()[0] || 'Fungsi R & P');
   setValue('userPosition', user?.position || '');
-  setValue('userRole', user?.role || 'admin');
+  setValue('userRole', user?.role || (superUser ? 'admin' : 'user'));
   setValue('userStatus', user?.status || 'active');
   setValue('userPassword', '');
   setValue('userPasswordConfirm', '');
@@ -17459,8 +17479,12 @@ function openUserModal(userId = '') {
   const confirmLabel = document.getElementById('userPasswordConfirmLabel');
   const passwordInput = document.getElementById('userPassword');
   const confirmInput = document.getElementById('userPasswordConfirm');
+  const roleField = document.getElementById('userRoleField');
+  if (roleField) roleField.hidden = !superUser;
   if (title) title.textContent = isEdit ? 'Edit Akun' : 'Akun Baru';
   if (eyebrow) eyebrow.textContent = isEdit ? 'EDIT AKUN' : 'TAMBAH AKUN';
+  const modalNote = document.getElementById('userModalNote');
+  if (modalNote) modalNote.textContent = superUser ? 'Akun e-MIRA' : 'Admin hanya dapat menambah akun User.';
   if (passwordLabel) passwordLabel.innerHTML = isEdit ? 'Password <span class="optional">(opsional)</span>' : 'Password <span class="required">*</span>';
   if (confirmLabel) confirmLabel.innerHTML = isEdit ? 'Konfirmasi password <span class="optional">(opsional)</span>' : 'Konfirmasi password <span class="required">*</span>';
   if (passwordInput) passwordInput.placeholder = isEdit ? 'Kosongkan jika tidak diubah' : 'Masukkan password minimal 6 karakter';
@@ -17473,12 +17497,17 @@ function openUserModal(userId = '') {
 
 async function saveUser(event) {
   event.preventDefault();
-  if (!isSuperUser()) {
-    showToast('Akses terbatas', 'Hanya Super User yang dapat mengelola akun.', 'warning');
+  const id = document.getElementById('userId')?.value || '';
+  const superUser = isSuperUser();
+  if (id && !superUser) {
+    showToast('Akses terbatas', 'Hanya Super User yang dapat mengubah akun.', 'warning');
+    return;
+  }
+  if (!id && !superUser && !isAdmin()) {
+    showToast('Akses terbatas', 'Anda tidak memiliki akses untuk menambah akun.', 'warning');
     return;
   }
 
-  const id = document.getElementById('userId')?.value || '';
   const name = document.getElementById('userName')?.value.trim() || '';
   const username = document.getElementById('userUsername')?.value.trim().toLowerCase() || '';
   const email = document.getElementById('userEmail')?.value.trim().toLowerCase() || '';
@@ -17486,7 +17515,8 @@ async function saveUser(event) {
   const phone = normalizePhone(rawPhone);
   const unit = document.getElementById('userUnit')?.value || getFungsiOptions()[0] || 'Fungsi R & P';
   const position = document.getElementById('userPosition')?.value.trim().slice(0, 60) || '';
-  const role = document.getElementById('userRole')?.value || 'admin';
+  const selectedRole = document.getElementById('userRole')?.value || 'admin';
+  const role = superUser ? selectedRole : 'user';
   const status = document.getElementById('userStatus')?.value || 'active';
   const rawPassword = document.getElementById('userPassword')?.value || '';
   const confirm = document.getElementById('userPasswordConfirm')?.value || '';
