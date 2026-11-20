@@ -3,12 +3,28 @@
 **Project Integrated Information and Application** — portal internal Fungsi
 Project R&P Cilacap. PROJIC menjadi pintu masuk aplikasi internal, saat ini:
 
-- **e-MIRA** — e-lektronik Manajemen Informasi Ruang & Agenda.
+- **e-MIRA** — e-lektronik Manajemen Informasi Ruang & Agenda, dengan pemesanan ruang rapat **24 jam setiap hari**.
 - **Tracking Perizinan GRC** — pemantauan status dan progres perizinan Green
   Refinery Cilacap.
 
 Portal juga menampilkan waktu live WIB, informasi cuaca dari API BMKG, dan
 prakiraan tiga hari.
+
+## Akun e-MIRA
+
+Saat membuat akun baru, kolom yang wajib diisi adalah **Nama Lengkap**,
+**Username**, **Password**, dan **Nomor HP/WhatsApp**. Email bersifat opsional.
+Saat mengedit akun, password boleh dikosongkan bila tidak diubah. Email pada
+data pekerja juga bersifat opsional. Email pada Profil Admin di Pusat Data
+tetap wajib karena dipakai sebagai pengirim/Reply-To notifikasi.
+
+Admin dapat membuka menu **Akun** dan menambah akun bertipe **User**. Edit,
+hapus, reset password, dan pengelolaan tipe akun tetap hanya untuk Super User.
+Admin juga tidak dapat mengakses menu Fungsi.
+
+User dapat membuat pemesanan ruang rapat dan membatalkan pemesanan miliknya
+sendiri. User tidak dapat mengubah atau menghapus pemesanan, mengirim
+notifikasi, atau mengelola data pekerja dan akun lain.
 
 ## Pratinjau
 
