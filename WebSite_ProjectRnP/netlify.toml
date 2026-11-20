@@ -1,7 +1,7 @@
 # Netlify: situs statis tanpa proses build.
 # Pastikan Base directory kosong dan Publish directory = "." di Netlify.
 [build]
-  publish = "."
+  publish = "/"
 
 # Fallback untuk URL dalam (deep link) agar tidak menampilkan Page Not Found.
 [[redirects]]
