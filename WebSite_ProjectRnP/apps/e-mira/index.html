@@ -7387,9 +7387,7 @@ body:not([data-role="superuser"]) [data-superuser-only] {
   display: none !important;
 }
 
-body[data-role="user"] [data-new-booking],
 body[data-role="user"] [data-notify-booking],
-body[data-role="user"] [data-cancel-booking],
 body:not([data-role="superuser"]) [data-edit-booking],
 body:not([data-role="superuser"]) [data-delete-booking],
 body:not([data-role="superuser"]) [data-new-worker],
@@ -8582,7 +8580,7 @@ body[data-role="user"] [data-worker-create] {
             <div class="card-head">
               <div>
                 <h2>Daftar Akun</h2>
-                <p>Super User dapat mengubah seluruh data akun; Admin dapat menambah akun User; User hanya melihat dan mengelola akunnya sendiri.</p>
+                <p>Super User dapat mengubah seluruh data akun; Admin dapat menambah akun User; User dapat memesan ruangan dan mengelola akunnya sendiri.</p>
               </div>
             </div>
             <div class="worker-bulk-bar" id="userBulkBar" hidden>
@@ -9288,8 +9286,8 @@ body[data-role="user"] [data-worker-create] {
             <div class="field" id="userRoleField">
               <label for="userRole">Tipe akun</label>
               <select id="userRole">
-                <option value="admin">Admin — jadwal & tambah pekerja</option>
-                <option value="user">User — hanya melihat</option>
+                <option value="admin">Admin — jadwal, pekerja & akun</option>
+                <option value="user">User — pesan ruangan</option>
                 <option value="superuser">Super User — akses penuh</option>
               </select>
             </div>
@@ -9312,7 +9310,7 @@ body[data-role="user"] [data-worker-create] {
           </div>
           <div class="settings-note">
             <svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg>
-            <span>Super User dapat mengubah seluruh data. Admin hanya dapat membuat dan membatalkan jadwal rapat. User hanya dapat melihat data tanpa mengubah apa pun.</span>
+            <span>Super User dapat mengubah seluruh data. Admin dapat membuat/membatalkan jadwal dan menambah akun User. User dapat memesan ruangan dan mengelola akunnya sendiri.</span>
           </div>
         </div>
         <div class="modal-foot">
@@ -10530,10 +10528,15 @@ function renderBookingAdminNote() {
   const note = document.getElementById('bookingAdminNote');
   if (!note) return;
 
-  const contacts = [adminProfile.email, formatPhone(adminProfile.phone)].filter(Boolean);
+  const creator = currentUser ? {
+    name: currentUser.name,
+    email: currentUser.email || adminProfile.email,
+    phone: currentUser.phone || adminProfile.phone
+  } : adminProfile;
+  const contacts = [creator.email, creator.phone ? formatPhone(creator.phone) : ''].filter(Boolean);
   note.innerHTML = `
     ${icon('i-user-plus')}
-    <span>Pemesanan dicatat oleh <strong>${esc(adminProfile.name)}</strong>${contacts.length ? ` · ${contacts.map(esc).join(' · ')}` : ''}.</span>
+    <span>Pemesanan dicatat oleh <strong>${esc(creator.name)}</strong>${contacts.length ? ` · ${contacts.map(esc).join(' · ')}` : ''}.</span>
   `;
 }
 
@@ -12653,7 +12656,7 @@ function openBookingForm(bookingId = null, prefill = {}) {
     return;
   }
   if (!bookingId && !canCreateBooking()) {
-    showToast('Akses terbatas', 'User hanya dapat melihat jadwal.', 'warning');
+    showToast('Akses terbatas', 'Anda tidak memiliki akses untuk membuat pemesanan.', 'warning');
     return;
   }
 
@@ -13376,7 +13379,7 @@ function saveBooking(event) {
     return;
   }
   if (!requestedId && !canCreateBooking()) {
-    showToast('Akses terbatas', 'User hanya dapat melihat jadwal.', 'warning');
+    showToast('Akses terbatas', 'Anda tidak memiliki akses untuk membuat pemesanan.', 'warning');
     return;
   }
 
@@ -13404,11 +13407,13 @@ function saveBooking(event) {
     notes: data.notes,
     status: 'active',
     createdBy: existing?.createdBy || {
-      name: adminProfile.name,
-      email: adminProfile.email,
-      phone: adminProfile.phone,
-      unit: adminProfile.unit,
-      position: adminProfile.position,
+      userId: currentUser?.id || '',
+      username: currentUser?.username || '',
+      name: currentUser?.name || adminProfile.name,
+      email: currentUser?.email || adminProfile.email,
+      phone: currentUser?.phone || adminProfile.phone,
+      unit: currentUser?.unit || adminProfile.unit,
+      position: currentUser?.position || adminProfile.position,
       capturedAt: now
     },
     createdAt: existing?.createdAt || now,
@@ -13889,7 +13894,7 @@ function openBookingDetail(bookingId) {
 
   const editable = isBookingEditable(booking);
   const canNotify = canSendNotification();
-  const canCancel = canCancelBooking();
+  const canCancel = canCancelBooking(booking);
   const canEdit = isSuperUser();
   const canDelete = isSuperUser();
   footer.innerHTML = `
@@ -14129,6 +14134,8 @@ function normalizeImportedBooking(raw, index) {
     organizer: String(raw.organizer || '—').slice(0, 60),
     organizerWorkerId: String(raw.organizerWorkerId || ''),
     createdBy: raw.createdBy && typeof raw.createdBy === 'object' ? {
+      userId: String(raw.createdBy.userId || ''),
+      username: String(raw.createdBy.username || ''),
       name: String(raw.createdBy.name || ''),
       email: String(raw.createdBy.email || ''),
       phone: normalizePhone(raw.createdBy.phone),
@@ -14293,13 +14300,13 @@ function askDeleteBooking(bookingId) {
 }
 
 function askCancelBooking(bookingId) {
-  if (!canCancelBooking()) {
-    showToast('Akses terbatas', 'User tidak dapat membatalkan pemesanan.', 'warning');
-    return;
-  }
-
   const booking = bookings.find((item) => item.id === bookingId);
   if (!booking) return;
+
+  if (!canCancelBooking(booking)) {
+    showToast('Akses terbatas', 'Anda hanya dapat membatalkan pemesanan milik sendiri.', 'warning');
+    return;
+  }
 
   if (!isBookingEditable(booking)) {
     showToast('Pemesanan tidak dapat dibatalkan', 'Agenda yang sudah selesai tidak dapat dibatalkan.', 'warning');
@@ -14534,14 +14541,13 @@ function handleConfirmAction() {
 }
 
 function confirmCancelBooking() {
-  if (!canCancelBooking()) {
-    showToast('Akses terbatas', 'User tidak dapat membatalkan pemesanan.', 'warning');
+  const booking = bookings.find((item) => item.id === state.pendingCancelId);
+  if (!booking) {
     closeModal('confirmModal');
     return;
   }
-
-  const booking = bookings.find((item) => item.id === state.pendingCancelId);
-  if (!booking) {
+  if (!canCancelBooking(booking)) {
+    showToast('Akses terbatas', 'Anda hanya dapat membatalkan pemesanan milik sendiri.', 'warning');
     closeModal('confirmModal');
     return;
   }
@@ -16286,7 +16292,7 @@ function handleDocumentClick(event) {
 
 function handleScheduleTrackClick(event, track) {
   if (!canCreateBooking()) {
-    showToast('Akses terbatas', 'User hanya dapat melihat jadwal.', 'warning');
+    showToast('Akses terbatas', 'Anda tidak memiliki akses untuk membuat pemesanan.', 'warning');
     return;
   }
 
@@ -16334,11 +16340,17 @@ function isAdmin() {
 }
 
 function canCreateBooking() {
-  return isSuperUser() || isAdmin();
+  return Boolean(currentUser) && currentUser.status === 'active';
 }
 
-function canCancelBooking() {
-  return isSuperUser() || isAdmin();
+function canCancelBooking(booking = null) {
+  if (!currentUser || currentUser.status !== 'active') return false;
+  if (isSuperUser() || isAdmin()) return true;
+  if (currentUser.role !== 'user' || !booking) return false;
+  const creator = booking.createdBy || {};
+  if (creator.userId) return creator.userId === currentUser.id;
+  if (creator.username) return creator.username === currentUser.username;
+  return false;
 }
 
 function canSendNotification() {
@@ -17278,8 +17290,8 @@ function renderUsers() {
     summary.innerHTML = `
       <div class="user-summary-card"><span>Total akun</span><strong>${appUsers.length}</strong><small>${activeCount} akun aktif</small></div>
       <div class="user-summary-card"><span>Super User</span><strong>${appUsers.filter((user) => user.role === 'superuser').length}</strong><small>Seluruh akses</small></div>
-      <div class="user-summary-card"><span>Admin</span><strong>${appUsers.filter((user) => user.role === 'admin').length}</strong><small>Buat & batalkan jadwal</small></div>
-      <div class="user-summary-card"><span>User</span><strong>${appUsers.filter((user) => user.role === 'user' || user.role === 'viewer').length}</strong><small>Hanya melihat</small></div>
+      <div class="user-summary-card"><span>Admin</span><strong>${appUsers.filter((user) => user.role === 'admin').length}</strong><small>Jadwal & tambah akun</small></div>
+      <div class="user-summary-card"><span>User</span><strong>${appUsers.filter((user) => user.role === 'user' || user.role === 'viewer').length}</strong><small>Pesan ruangan</small></div>
     `;
   }
 
