@@ -8629,7 +8629,7 @@ body[data-role="user"] [data-worker-create] {
               <div class="card-head">
                 <div>
                   <h2>Ubah Password</h2>
-                  <p>Minimal 6 karakter. Password default akun baru adalah <strong>000000</strong>.</p>
+                  <p>Minimal 6 karakter. Password wajib diisi saat membuat akun baru.</p>
                 </div>
               </div>
               <form id="myPasswordForm" novalidate>
@@ -8991,7 +8991,7 @@ body[data-role="user"] [data-worker-create] {
               </label>
             </div>
             <div class="field">
-              <label for="fieldWorkerEmail">Email</label>
+              <label for="fieldWorkerEmail">Email <span class="optional">(opsional)</span></label>
               <input type="email" id="fieldWorkerEmail" maxlength="100" placeholder="nama@patraniaga.co.id" autocomplete="off">
             </div>
             <div class="field">
@@ -9204,7 +9204,7 @@ body[data-role="user"] [data-worker-create] {
           <div class="form-alert" id="myAccountAlert" role="alert" hidden></div>
           <div class="form-grid">
             <div class="field full">
-              <label for="myAccountName">Nama akun <span class="required">*</span></label>
+              <label for="myAccountName">Nama lengkap <span class="required">*</span></label>
               <input type="text" id="myAccountName" maxlength="80" autocomplete="name">
             </div>
             <div class="field">
@@ -9212,11 +9212,11 @@ body[data-role="user"] [data-worker-create] {
               <input type="text" id="myAccountUsername" disabled>
             </div>
             <div class="field">
-              <label for="myAccountEmail">Email</label>
+              <label for="myAccountEmail">Email <span class="optional">(opsional)</span></label>
               <input type="email" id="myAccountEmail" maxlength="100" autocomplete="email">
             </div>
             <div class="field">
-              <label for="myAccountPhone">WhatsApp</label>
+              <label for="myAccountPhone">Nomor HP / WhatsApp <span class="required">*</span></label>
               <input type="tel" id="myAccountPhone" maxlength="24" autocomplete="tel">
             </div>
             <div class="field">
@@ -9259,7 +9259,7 @@ body[data-role="user"] [data-worker-create] {
           <div class="form-alert" id="userFormAlert" role="alert" hidden></div>
           <div class="form-grid">
             <div class="field full">
-              <label for="userName">Nama akun <span class="required">*</span></label>
+              <label for="userName">Nama lengkap <span class="required">*</span></label>
               <input type="text" id="userName" maxlength="80" placeholder="Nama lengkap" autocomplete="name">
             </div>
             <div class="field">
@@ -9268,14 +9268,14 @@ body[data-role="user"] [data-worker-create] {
               <span class="field-note">Huruf kecil, angka, titik, strip, atau garis bawah.</span>
             </div>
             <div class="field">
-              <label for="userEmail">Email akun</label>
+              <label for="userEmail">Email <span class="optional">(opsional)</span></label>
               <input type="email" id="userEmail" maxlength="100" placeholder="nama@perusahaan.co.id" autocomplete="email">
-              <span class="field-note">Dipakai sebagai Reply-To notifikasi untuk Admin.</span>
+              <span class="field-note">Opsional. Dipakai untuk kontak dan notifikasi bila diisi.</span>
             </div>
             <div class="field">
-              <label for="userPhone">WhatsApp akun</label>
+              <label for="userPhone">Nomor HP / WhatsApp <span class="required">*</span></label>
               <input type="tel" id="userPhone" maxlength="24" placeholder="0812-3456-7890" autocomplete="tel">
-              <span class="field-note">Kontak admin pada data notifikasi.</span>
+              <span class="field-note">Wajib diisi. Digunakan sebagai kontak akun dan notifikasi WhatsApp.</span>
             </div>
             <div class="field">
               <label for="userUnit">Fungsi</label>
@@ -9286,7 +9286,7 @@ body[data-role="user"] [data-worker-create] {
               <input type="text" id="userPosition" maxlength="60" placeholder="Contoh: Staf Administrasi" autocomplete="organization-title">
             </div>
             <div class="field">
-              <label for="userRole">Tipe akun <span class="required">*</span></label>
+              <label for="userRole">Tipe akun</label>
               <select id="userRole">
                 <option value="admin">Admin — jadwal & tambah pekerja</option>
                 <option value="user">User — hanya melihat</option>
@@ -9301,13 +9301,13 @@ body[data-role="user"] [data-worker-create] {
               </select>
             </div>
             <div class="field">
-              <label for="userPassword">Password <span class="optional">(opsional)</span></label>
-              <input type="password" id="userPassword" maxlength="80" placeholder="Default 000000" autocomplete="new-password">
-              <span class="field-note" id="userPasswordNote">Kosongkan untuk memakai default 000000. Minimal 6 karakter.</span>
+              <label for="userPassword" id="userPasswordLabel">Password <span class="required">*</span></label>
+              <input type="password" id="userPassword" maxlength="80" placeholder="Masukkan password minimal 6 karakter" autocomplete="new-password">
+              <span class="field-note" id="userPasswordNote">Wajib diisi untuk akun baru. Minimal 6 karakter.</span>
             </div>
             <div class="field">
-              <label for="userPasswordConfirm">Konfirmasi password</label>
-              <input type="password" id="userPasswordConfirm" maxlength="80" placeholder="Ulangi password (opsional)" autocomplete="new-password">
+              <label for="userPasswordConfirm" id="userPasswordConfirmLabel">Konfirmasi password <span class="required">*</span></label>
+              <input type="password" id="userPasswordConfirm" maxlength="80" placeholder="Ulangi password" autocomplete="new-password">
             </div>
           </div>
           <div class="settings-note">
@@ -9682,7 +9682,6 @@ const USERS_STORAGE_KEY = 'emira_users_rp_cilacap_v1';
 const SESSION_STORAGE_KEY = 'emira_session_rp_cilacap_v1';
 const PASSWORD_VAULT_KEY = 'emira_password_vault_key_v1';
 const HOME_PAGE_STORAGE_KEY = 'emira_home_page_v1';
-const DEFAULT_ACCOUNT_PASSWORD = '000000';
 const STORAGE_VERSION = 2;
 const OPEN_START = 0;
 const OPEN_END = 24 * 60;
@@ -17105,7 +17104,7 @@ function renderMyAccount() {
       <span class="role-badge is-${esc(currentUser.role)}">${esc(role)}</span>
     </div>
     <div class="account-data-list">
-      <div class="account-data-row"><span>Nama akun</span><strong>${esc(currentUser.name)}</strong></div>
+      <div class="account-data-row"><span>Nama lengkap</span><strong>${esc(currentUser.name)}</strong></div>
       <div class="account-data-row"><span>Username</span><strong>${esc(currentUser.username)}</strong></div>
       <div class="account-data-row"><span>Tipe akun</span><strong>${esc(role)}</strong></div>
       <div class="account-data-row"><span>Email</span><strong>${esc(email)}</strong></div>
@@ -17155,10 +17154,10 @@ function saveMyAccount(event) {
   const errors = [];
 
   document.querySelectorAll('#myAccountForm .invalid').forEach((element) => element.classList.remove('invalid'));
-  if (name.length < 3) errors.push({ field: 'myAccountName', message: 'Nama akun minimal 3 karakter.' });
+  if (name.length < 3) errors.push({ field: 'myAccountName', message: 'Nama lengkap minimal 3 karakter.' });
   if (email && !isValidEmail(email)) errors.push({ field: 'myAccountEmail', message: 'Format email tidak valid.' });
-  if (currentUser.role === 'admin' && !email) errors.push({ field: 'myAccountEmail', message: 'Email wajib diisi untuk akun Admin.' });
-  if (rawPhone && (phone.length < 10 || phone.length > 15)) errors.push({ field: 'myAccountPhone', message: 'Nomor WhatsApp tidak valid.' });
+  if (!rawPhone) errors.push({ field: 'myAccountPhone', message: 'Nomor HP wajib diisi.' });
+  else if (phone.length < 10 || phone.length > 15) errors.push({ field: 'myAccountPhone', message: 'Nomor HP tidak valid.' });
 
   if (errors.length) {
     errors.forEach((error) => document.getElementById(error.field)?.classList.add('invalid'));
@@ -17445,9 +17444,17 @@ function openUserModal(userId = '') {
   const title = document.getElementById('userModalTitle');
   const eyebrow = document.getElementById('userModalEyebrow');
   const note = document.getElementById('userPasswordNote');
+  const passwordLabel = document.getElementById('userPasswordLabel');
+  const confirmLabel = document.getElementById('userPasswordConfirmLabel');
+  const passwordInput = document.getElementById('userPassword');
+  const confirmInput = document.getElementById('userPasswordConfirm');
   if (title) title.textContent = isEdit ? 'Edit Akun' : 'Akun Baru';
   if (eyebrow) eyebrow.textContent = isEdit ? 'EDIT AKUN' : 'TAMBAH AKUN';
-  if (note) note.textContent = isEdit ? 'Kosongkan bila password tidak diubah. Minimal 6 karakter.' : 'Kosongkan untuk memakai default 000000. Minimal 6 karakter.';
+  if (passwordLabel) passwordLabel.innerHTML = isEdit ? 'Password <span class="optional">(opsional)</span>' : 'Password <span class="required">*</span>';
+  if (confirmLabel) confirmLabel.innerHTML = isEdit ? 'Konfirmasi password <span class="optional">(opsional)</span>' : 'Konfirmasi password <span class="required">*</span>';
+  if (passwordInput) passwordInput.placeholder = isEdit ? 'Kosongkan jika tidak diubah' : 'Masukkan password minimal 6 karakter';
+  if (confirmInput) confirmInput.placeholder = isEdit ? 'Ulangi password baru (opsional)' : 'Ulangi password';
+  if (note) note.textContent = isEdit ? 'Kosongkan bila password tidak diubah. Minimal 6 karakter.' : 'Wajib diisi untuk akun baru. Minimal 6 karakter.';
 
   openModal('userModal');
   window.setTimeout(() => document.getElementById('userName')?.focus(), 80);
@@ -17464,7 +17471,8 @@ async function saveUser(event) {
   const name = document.getElementById('userName')?.value.trim() || '';
   const username = document.getElementById('userUsername')?.value.trim().toLowerCase() || '';
   const email = document.getElementById('userEmail')?.value.trim().toLowerCase() || '';
-  const phone = normalizePhone(document.getElementById('userPhone')?.value.trim() || '');
+  const rawPhone = document.getElementById('userPhone')?.value.trim() || '';
+  const phone = normalizePhone(rawPhone);
   const unit = document.getElementById('userUnit')?.value || getFungsiOptions()[0] || 'Fungsi R & P';
   const position = document.getElementById('userPosition')?.value.trim().slice(0, 60) || '';
   const role = document.getElementById('userRole')?.value || 'admin';
@@ -17472,13 +17480,12 @@ async function saveUser(event) {
   const rawPassword = document.getElementById('userPassword')?.value || '';
   const confirm = document.getElementById('userPasswordConfirm')?.value || '';
   const existing = appUsers.find((user) => user.id === id) || null;
-  const usesDefaultPassword = !existing && !rawPassword;
-  const password = rawPassword || (!existing ? DEFAULT_ACCOUNT_PASSWORD : '');
+  const password = rawPassword;
   const errors = [];
 
   document.querySelectorAll('#userForm .invalid').forEach((element) => element.classList.remove('invalid'));
 
-  if (name.length < 3) errors.push({ field: 'userName', message: 'Nama akun minimal 3 karakter.' });
+  if (name.length < 3) errors.push({ field: 'userName', message: 'Nama lengkap minimal 3 karakter.' });
   if (!/^[a-z0-9._-]{4,30}$/.test(username)) {
     errors.push({ field: 'userUsername', message: 'Username 4–30 karakter: huruf kecil, angka, titik, strip, atau garis bawah.' });
   }
@@ -17489,16 +17496,24 @@ async function saveUser(event) {
     errors.push({ field: 'userRole', message: 'Tipe akun tidak valid.' });
   }
   if (email && !isValidEmail(email)) {
-    errors.push({ field: 'userEmail', message: 'Format email akun tidak valid.' });
+    errors.push({ field: 'userEmail', message: 'Format email tidak valid.' });
   }
-  if (role === 'admin' && !email) {
-    errors.push({ field: 'userEmail', message: 'Email korporasi wajib diisi untuk akun Admin agar notifikasi dapat dikirim.' });
+  if (!rawPhone) {
+    errors.push({ field: 'userPhone', message: 'Nomor HP wajib diisi.' });
+  } else if (phone.length < 10 || phone.length > 15) {
+    errors.push({ field: 'userPhone', message: 'Nomor HP tidak valid.' });
   }
-  if (document.getElementById('userPhone')?.value.trim() && (phone.length < 10 || phone.length > 15)) {
-    errors.push({ field: 'userPhone', message: 'Nomor WhatsApp akun tidak valid.' });
+  if (!existing && !password) {
+    errors.push({ field: 'userPassword', message: 'Password wajib diisi untuk akun baru.' });
   }
   if (password && password.length < 6) errors.push({ field: 'userPassword', message: 'Password minimal 6 karakter.' });
-  if (!usesDefaultPassword && password && password !== confirm) errors.push({ field: 'userPasswordConfirm', message: 'Konfirmasi password tidak sama.' });
+  if (!existing && !confirm) {
+    errors.push({ field: 'userPasswordConfirm', message: 'Konfirmasi password wajib diisi.' });
+  }
+  if (!password && confirm) {
+    errors.push({ field: 'userPassword', message: 'Isi password terlebih dahulu atau kosongkan konfirmasi.' });
+  }
+  if (password && password !== confirm) errors.push({ field: 'userPasswordConfirm', message: 'Konfirmasi password tidak sama.' });
 
   if (existing && existing.role === 'superuser' && existing.status === 'active') {
     const otherSupers = appUsers.filter((user) => user.id !== existing.id && user.role === 'superuser' && user.status === 'active');
