@@ -15465,6 +15465,19 @@ async function triggerGatewaySend(job = state.currentNotification) {
   showToast('Notifikasi gagal dikirim', 'Gunakan tombol email atau WhatsApp untuk pengiriman manual.', 'error');
 }
 
+function launchExternalUrl(url, newTab = false) {
+  const link = document.createElement('a');
+  link.href = url;
+  link.style.display = 'none';
+  if (newTab) {
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+  }
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+}
+
 function openEmailNotification(workerId = '') {
   const job = state.currentNotification;
   if (!job || !job.emailRecipients.length) {
@@ -15493,7 +15506,7 @@ function openEmailNotification(workerId = '') {
     `${recipients.length} penerima ditandai Terkirim. Status dapat dibatalkan bila perlu dikirim ulang.`,
     'success'
   );
-  window.location.href = url;
+  launchExternalUrl(url, false);
 }
 
 function openWhatsAppNotification(workerId) {
@@ -15505,11 +15518,9 @@ function openWhatsAppNotification(workerId) {
   }
 
   const url = `https://wa.me/${worker.phone}?text=${encodeURIComponent(job.waMessage)}`;
-  const opened = window.open(url, '_blank', 'noopener,noreferrer');
-  if (!opened) {
-    showToast('Popup diblokir', 'Izinkan popup untuk membuka WhatsApp, lalu coba lagi.', 'warning');
-    return;
-  }
+  // Gunakan anchor dengan target blank. Ini lebih konsisten daripada
+  // window.open(..., 'noopener') yang dapat mengembalikan null di sebagian browser.
+  launchExternalUrl(url, true);
   saveNotificationDelivery(job, 'whatsapp', [worker.id], 'manual');
   renderNotificationComposer(job);
   showToast(
