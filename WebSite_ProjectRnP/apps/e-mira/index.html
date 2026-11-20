@@ -7965,7 +7965,7 @@ body[data-role="user"] [data-worker-create] {
     </div>
     <footer class="login-footer">
       <span>© 2026 PT Pertamina Patra Niaga · Fungsi R &amp; P Cilacap</span>
-      <span>e-MIRA V.2.0 · Cloud</span>
+      <span>e-MIRA V.2.2 · Cloud</span>
     </footer>
   </div>
 
@@ -7982,7 +7982,7 @@ body[data-role="user"] [data-worker-create] {
         <div class="app-identity">
           <div class="app-identity-row">
             <span class="app-name">e-MIRA</span>
-            <span class="app-version">V.2.0 · Cloud</span>
+            <span class="app-version">V.2.2 · Cloud</span>
           </div>
           <span class="app-desc">e-lektronik Manajemen Informasi Ruang &amp; Agenda</span>
         </div>
@@ -8654,7 +8654,7 @@ body[data-role="user"] [data-worker-create] {
       <footer class="app-footer">
         <span>© <span id="footerYear">2026</span> PT Pertamina Patra Niaga — Fungsi R &amp; P Cilacap</span>
         <span class="footer-sep">·</span>
-        <span>e-MIRA V.2.0 · Cloud</span>
+        <span>e-MIRA V.2.2 · Cloud</span>
       </footer>
     </div>
   </div>
@@ -9655,8 +9655,23 @@ body[data-role="user"] [data-worker-create] {
     <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 21V9m0 0-5 5m5-5 5 5M5 3h14"/></symbol>
   </svg>
 
-  <script src="../../assets/vendor/supabase.js?v=2.0.0"></script>
-  <script src="supabase-config.js?v=2.0.0"></script>
+  <script src="../../assets/vendor/supabase.js?v=2.2.0"></script>
+  <script>
+    /* Fallback CDN: tetap berfungsi bila folder vendor belum ikut terunggah. */
+    if (!window.supabase?.createClient) {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"><\/script>');
+    }
+  </script>
+  <script src="supabase-config.js?v=2.2.0"></script>
+  <script>
+    /* Fallback konfigurasi publik: aplikasi tetap bisa login bila berkas
+       supabase-config.js belum terunggah. Kunci publishable aman di frontend
+       selama RLS aktif. Jangan menaruh service_role key di sini. */
+    if (!window.EMIRA_SUPABASE_URL || !window.EMIRA_SUPABASE_ANON_KEY) {
+      window.EMIRA_SUPABASE_URL = 'https://kxphqjokjtvgnrpnnzsp.supabase.co';
+      window.EMIRA_SUPABASE_ANON_KEY = 'sb_publishable_whlAFMkaFntjl2JgefJfqg_8KrOfz8J';
+    }
+  </script>
   <script>
 /* =========================================================
    e-MIRA — e-lektronik Manajemen Informasi Ruang & Agenda
@@ -18082,7 +18097,10 @@ async function bootstrapAuth() {
   authReady = false;
   if (!cloud) {
     authReady = true;
-    showLogin('Konfigurasi Supabase belum tersedia. Periksa koneksi lalu muat ulang.');
+    const missing = [];
+    if (!window.supabase?.createClient) missing.push('pustaka Supabase');
+    if (!window.EMIRA_SUPABASE_URL || !window.EMIRA_SUPABASE_ANON_KEY) missing.push('konfigurasi Supabase');
+    showLogin(`${missing.length ? missing.join(' dan ') : 'Klien Supabase'} tidak termuat. Periksa koneksi lalu muat ulang.`);
     return;
   }
 
@@ -18161,24 +18179,15 @@ function initialize() {
 }
 
 function prepareLaunchData() {
+  // Jangan menghapus data e-MIRA lokal di sini. Data pekerja/pemesanan lama
+  // dibutuhkan untuk migrasi pertama ke Supabase. Cukup tandai versi launch.
   const marker = 'emira_launch_clean_v1';
   try {
-    if (window.localStorage.getItem(marker)) return;
-    const keys = [];
-    for (let index = 0; index < window.localStorage.length; index += 1) {
-      const key = window.localStorage.key(index);
-      if (key && (key.startsWith('sirama_') || key.startsWith('emira_'))) keys.push(key);
+    if (!window.localStorage.getItem(marker)) {
+      window.localStorage.setItem(marker, new Date().toISOString());
     }
-    keys.forEach((key) => window.localStorage.removeItem(key));
-    try {
-      window.sessionStorage.removeItem('emira_session_rp_cilacap_v1');
-      window.sessionStorage.removeItem('sirama_session_rp_cilacap_v1');
-    } catch (error) {
-      // abaikan
-    }
-    window.localStorage.setItem(marker, new Date().toISOString());
   } catch (error) {
-    console.warn('e-MIRA: pembersihan data awal gagal.', error);
+    console.warn('e-MIRA: penanda launch tidak dapat disimpan.', error);
   }
 }
 
