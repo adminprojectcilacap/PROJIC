@@ -1733,7 +1733,7 @@ ul {
 }
 
 .timeline {
-  min-width: 1000px;
+  min-width: 1360px;
 }
 
 .timeline-head {
@@ -1757,7 +1757,7 @@ ul {
 
 .timeline-hours {
   display: grid;
-  grid-template-columns: repeat(11, minmax(0, 1fr));
+  grid-template-columns: repeat(24, minmax(0, 1fr));
 }
 
 .hour-head {
@@ -1833,7 +1833,7 @@ ul {
   position: absolute;
   inset: 0;
   display: grid;
-  grid-template-columns: repeat(11, minmax(0, 1fr));
+  grid-template-columns: repeat(24, minmax(0, 1fr));
   pointer-events: none;
 }
 
@@ -8247,7 +8247,7 @@ body[data-role="user"] [data-worker-create] {
             <div class="timeline-footnote">
               <span>
                 <svg class="icon" aria-hidden="true"><use href="#i-info"></use></svg>
-                Jam operasional ruang rapat: 07.00–18.00 WIB
+                Pemesanan ruang rapat tersedia 24 jam setiap hari · 00.00–24.00 WIB
               </span>
               <span class="timeline-hint">Klik slot kosong untuk mengisi formulir pemesanan.</span>
             </div>
@@ -8336,7 +8336,7 @@ body[data-role="user"] [data-worker-create] {
             </div>
             <div>
               <strong>Ketentuan penggunaan ruangan</strong>
-              <p>Pemesanan ruangan mengikuti jam operasional 07.00–18.00 WIB. Pastikan jumlah peserta tidak melebihi kapasitas dan tidak terdapat jadwal yang bertumpang tindih pada ruangan yang sama.</p>
+              <p>Pemesanan ruangan tersedia 24 jam setiap hari, mulai 00.00 hingga 24.00 WIB. Pastikan jumlah peserta tidak melebihi kapasitas dan tidak terdapat jadwal yang bertumpang tindih pada ruangan yang sama.</p>
             </div>
           </div>
         </section>
@@ -8457,7 +8457,7 @@ body[data-role="user"] [data-worker-create] {
             <span class="report-period-dot"></span>
             Periode laporan: <strong id="reportPeriodLabel">November 2026</strong>
             <span class="report-period-sep">·</span>
-            <span>Hari kerja Senin–Jumat · 07.00–18.00 WIB</span>
+            <span>Setiap hari · 24 jam · 00.00–24.00 WIB</span>
           </div>
 
           <div class="kpi-grid report-kpi-grid" id="reportSummaryGrid"></div>
@@ -9684,8 +9684,8 @@ const PASSWORD_VAULT_KEY = 'emira_password_vault_key_v1';
 const HOME_PAGE_STORAGE_KEY = 'emira_home_page_v1';
 const DEFAULT_ACCOUNT_PASSWORD = '000000';
 const STORAGE_VERSION = 2;
-const OPEN_START = 7 * 60;
-const OPEN_END = 18 * 60;
+const OPEN_START = 0;
+const OPEN_END = 24 * 60;
 const OPEN_DURATION = OPEN_END - OPEN_START;
 const BOOKINGS_PER_PAGE = 8;
 
@@ -10002,11 +10002,15 @@ function formatMonthLabel(monthISO) {
 function timeToMinutes(value) {
   if (!value || !/^\d{2}:\d{2}$/.test(value)) return NaN;
   const [hours, minutes] = value.split(':').map(Number);
+  if (!Number.isInteger(hours) || !Number.isInteger(minutes)) return NaN;
+  if (hours < 0 || hours > 24 || minutes < 0 || minutes > 59) return NaN;
+  if (hours === 24 && minutes !== 0) return NaN;
   return hours * 60 + minutes;
 }
 
 function minutesToTime(minutes) {
-  const safe = Math.max(0, Math.min(23 * 60 + 59, Math.round(minutes)));
+  const safe = Math.max(0, Math.min(24 * 60, Math.round(minutes)));
+  if (safe === 24 * 60) return '24:00';
   return `${pad(Math.floor(safe / 60))}:${pad(safe % 60)}`;
 }
 
@@ -10131,19 +10135,6 @@ function sortBookings(list, direction = 'asc') {
 
 function activeBookings() {
   return bookings.filter((booking) => booking.status !== 'cancelled');
-}
-
-function countWeekdaysInMonth(monthISO) {
-  const [year, month] = monthISO.split('-').map(Number);
-  const totalDays = new Date(year, month, 0).getDate();
-  let count = 0;
-
-  for (let day = 1; day <= totalDays; day += 1) {
-    const weekday = new Date(year, month - 1, day).getDay();
-    if (weekday !== 0 && weekday !== 6) count += 1;
-  }
-
-  return count;
 }
 
 function monthDays(monthISO) {
@@ -10920,8 +10911,8 @@ function renderSchedule() {
   const dayBookings = sortBookings(activeBookings().filter((booking) => booking.date === selectedDate), 'asc');
   const now = currentMinutes();
 
-  const hourHeaders = Array.from({ length: 11 }, (_, index) => (
-    `<div class="hour-head">${pad(7 + index)}:00</div>`
+  const hourHeaders = Array.from({ length: 24 }, (_, index) => (
+    `<div class="hour-head">${pad(index)}:00</div>`
   )).join('');
 
   const rows = ROOMS.map((room) => {
@@ -10974,7 +10965,7 @@ function renderSchedule() {
         </div>
         <div class="timeline-track" data-track-room="${room.id}" title="Klik untuk menambahkan pemesanan pada ${esc(room.name)}">
           <div class="track-grid" aria-hidden="true">
-            ${Array.from({ length: 11 }, () => '<span class="track-cell"></span>').join('')}
+            ${Array.from({ length: 24 }, () => '<span class="track-cell"></span>').join('')}
           </div>
           ${blocks}
           ${nowLine}
@@ -10993,7 +10984,7 @@ function renderSchedule() {
 
   const totalHours = dayBookings.reduce((total, booking) => total + durationHours(booking), 0);
   const usedRooms = new Set(dayBookings.map((booking) => booking.roomId)).size;
-  const freeCapacity = Math.max(0, (ROOMS.length * 11) - totalHours);
+  const freeCapacity = Math.max(0, (ROOMS.length * (OPEN_DURATION / 60)) - totalHours);
   const summary = document.getElementById('scheduleSummary');
 
   if (summary) {
@@ -11323,7 +11314,7 @@ function renderRooms() {
   const container = document.getElementById('roomsGrid');
   if (!container) return;
 
-  const weekdays = countWeekdaysInMonth(todayISO().slice(0, 7));
+  const days = monthDays(todayISO().slice(0, 7));
   const month = todayISO().slice(0, 7);
 
   container.innerHTML = ROOMS.map((room) => {
@@ -11331,7 +11322,7 @@ function renderRooms() {
       booking.roomId === room.id && booking.date.startsWith(month)
     ));
     const hours = monthBookings.reduce((total, booking) => total + durationHours(booking), 0);
-    const capacity = weekdays * (OPEN_DURATION / 60);
+    const capacity = days * (OPEN_DURATION / 60);
     const utilization = capacity > 0 ? (hours / capacity) * 100 : 0;
     const situation = getRoomSituation(room.id);
     const isBusy = Boolean(situation.current);
@@ -12156,8 +12147,8 @@ function renderReports() {
   const monthBookings = activeBookings().filter((booking) => booking.date.startsWith(state.reportMonth));
   const totalBookings = monthBookings.length;
   const totalHours = monthBookings.reduce((total, booking) => total + durationHours(booking), 0);
-  const weekdays = countWeekdaysInMonth(state.reportMonth);
-  const totalCapacity = ROOMS.length * weekdays * (OPEN_DURATION / 60);
+  const days = monthDays(state.reportMonth);
+  const totalCapacity = ROOMS.length * days * (OPEN_DURATION / 60);
   const utilization = totalCapacity > 0 ? (totalHours / totalCapacity) * 100 : 0;
   const average = totalBookings > 0 ? totalHours / totalBookings : 0;
   const typeCounts = new Set(monthBookings.map((booking) => booking.type)).size;
@@ -12165,7 +12156,7 @@ function renderReports() {
   const perRoom = ROOMS.map((room) => {
     const roomBookings = monthBookings.filter((booking) => booking.roomId === room.id);
     const hours = roomBookings.reduce((total, booking) => total + durationHours(booking), 0);
-    const roomCapacity = weekdays * (OPEN_DURATION / 60);
+    const roomCapacity = days * (OPEN_DURATION / 60);
     const roomUtilization = roomCapacity > 0 ? (hours / roomCapacity) * 100 : 0;
     return { room, bookings: roomBookings.length, hours, utilization: roomUtilization };
   });
@@ -12521,12 +12512,14 @@ function defaultFormValues(prefill = {}) {
   let start = prefill.start;
 
   if (!start) {
-    if (date === todayISO() && now >= 17 * 60) {
-      date = addDaysISO(todayISO(), 1);
-      start = '09:00';
-    } else if (date === todayISO() && now > 8 * 60) {
-      const nextSlot = Math.min(17 * 60, Math.ceil((now + 15) / 30) * 30);
-      start = minutesToTime(nextSlot);
+    if (date === todayISO()) {
+      const nextSlot = Math.ceil((now + 15) / 30) * 30;
+      if (nextSlot > OPEN_END - 30) {
+        date = addDaysISO(todayISO(), 1);
+        start = '00:00';
+      } else {
+        start = minutesToTime(nextSlot);
+      }
     } else {
       start = '09:00';
     }
@@ -13222,7 +13215,7 @@ function updateBookingFormState() {
   }
 
   if (startMinutes < OPEN_START || endMinutes > OPEN_END) {
-    setAvailabilityHint('error', 'Ruangan hanya dapat digunakan antara pukul 07.00–18.00 WIB.');
+    setAvailabilityHint('error', 'Waktu pemesanan harus berada dalam rentang 00.00–24.00 WIB.');
     return;
   }
 
@@ -13302,10 +13295,10 @@ function validateBookingForm() {
     errors.push({ field: 'fieldEnd', message: 'Waktu selesai harus lebih besar dari waktu mulai.' });
   }
   if (start && (startMinutes < OPEN_START || startMinutes >= OPEN_END)) {
-    errors.push({ field: 'fieldStart', message: 'Waktu mulai harus di antara 07.00–17.30 WIB.' });
+    errors.push({ field: 'fieldStart', message: 'Waktu mulai harus di antara 00.00–23.30 WIB.' });
   }
   if (end && (endMinutes <= OPEN_START || endMinutes > OPEN_END)) {
-    errors.push({ field: 'fieldEnd', message: 'Waktu selesai maksimal pukul 18.00 WIB.' });
+    errors.push({ field: 'fieldEnd', message: 'Waktu selesai maksimal pukul 24.00 WIB.' });
   }
   if (!hiddenId?.value && date === todayISO() && startMinutes < currentMinutes()) {
     errors.push({ field: 'fieldStart', message: 'Waktu mulai sudah berlalu.' });
