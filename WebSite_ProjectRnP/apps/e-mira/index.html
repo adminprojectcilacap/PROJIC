@@ -7959,13 +7959,13 @@ body[data-role="user"] [data-worker-create] {
         </form>
         <div class="login-card-note">
           <svg class="icon" aria-hidden="true"><use href="#i-shield"></use></svg>
-          <span>Penambahan akun atau reset password, hubungi admin e-MIRA.</span>
+          <span>Lupa password atau butuh akun baru? Hubungi Super User e-MIRA.</span>
         </div>
       </section>
     </div>
     <footer class="login-footer">
       <span>© 2026 PT Pertamina Patra Niaga · Fungsi R &amp; P Cilacap</span>
-      <span>e-MIRA V.1.0</span>
+      <span>e-MIRA V.2.0 · Cloud</span>
     </footer>
   </div>
 
@@ -7982,7 +7982,7 @@ body[data-role="user"] [data-worker-create] {
         <div class="app-identity">
           <div class="app-identity-row">
             <span class="app-name">e-MIRA</span>
-            <span class="app-version">V.1.0</span>
+            <span class="app-version">V.2.0 · Cloud</span>
           </div>
           <span class="app-desc">e-lektronik Manajemen Informasi Ruang &amp; Agenda</span>
         </div>
@@ -8565,7 +8565,7 @@ body[data-role="user"] [data-worker-create] {
             <div class="page-actions">
               <button class="btn btn-outline-danger" id="deleteAllUsersBtn" data-superuser-only>
                 <svg class="icon" aria-hidden="true"><use href="#i-trash"></use></svg>
-                Hapus Semua Akun Lain
+                Nonaktifkan Semua Akun Lain
               </button>
               <button class="btn btn-primary" id="addUserBtn" data-account-manager>
                 <svg class="icon" aria-hidden="true"><use href="#i-user-plus"></use></svg>
@@ -8586,7 +8586,7 @@ body[data-role="user"] [data-worker-create] {
             <div class="worker-bulk-bar" id="userBulkBar" hidden>
               <span id="userSelectedCount">0 akun dipilih</span>
               <div class="worker-bulk-actions">
-                <button type="button" class="btn btn-outline-danger btn-sm" id="deleteSelectedUsersBtn">Hapus Terpilih</button>
+                <button type="button" class="btn btn-outline-danger btn-sm" id="deleteSelectedUsersBtn">Nonaktifkan Terpilih</button>
                 <button type="button" class="btn btn-ghost btn-sm" id="clearUserSelectionBtn">Batal</button>
               </div>
             </div>
@@ -8654,7 +8654,7 @@ body[data-role="user"] [data-worker-create] {
       <footer class="app-footer">
         <span>© <span id="footerYear">2026</span> PT Pertamina Patra Niaga — Fungsi R &amp; P Cilacap</span>
         <span class="footer-sep">·</span>
-        <span>e-MIRA V.1.0</span>
+        <span>e-MIRA V.2.0 · Cloud</span>
       </footer>
     </div>
   </div>
@@ -9298,12 +9298,12 @@ body[data-role="user"] [data-worker-create] {
                 <option value="inactive">Nonaktif</option>
               </select>
             </div>
-            <div class="field">
+            <div class="field" id="userPasswordField">
               <label for="userPassword" id="userPasswordLabel">Password <span class="required">*</span></label>
               <input type="password" id="userPassword" maxlength="80" placeholder="Masukkan password minimal 6 karakter" autocomplete="new-password">
               <span class="field-note" id="userPasswordNote">Wajib diisi untuk akun baru. Minimal 6 karakter.</span>
             </div>
-            <div class="field">
+            <div class="field" id="userPasswordConfirmField">
               <label for="userPasswordConfirm" id="userPasswordConfirmLabel">Konfirmasi password <span class="required">*</span></label>
               <input type="password" id="userPasswordConfirm" maxlength="80" placeholder="Ulangi password" autocomplete="new-password">
             </div>
@@ -9655,6 +9655,8 @@ body[data-role="user"] [data-worker-create] {
     <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 21V9m0 0-5 5m5-5 5 5M5 3h14"/></symbol>
   </svg>
 
+  <script src="../../assets/vendor/supabase.js?v=2.0.0"></script>
+  <script src="supabase-config.js?v=2.0.0"></script>
   <script>
 /* =========================================================
    e-MIRA — e-lektronik Manajemen Informasi Ruang & Agenda
@@ -9680,6 +9682,7 @@ const USERS_STORAGE_KEY = 'emira_users_rp_cilacap_v1';
 const SESSION_STORAGE_KEY = 'emira_session_rp_cilacap_v1';
 const PASSWORD_VAULT_KEY = 'emira_password_vault_key_v1';
 const HOME_PAGE_STORAGE_KEY = 'emira_home_page_v1';
+const CLOUD_MIGRATION_KEY = 'emira_cloud_migrated_v1';
 const STORAGE_VERSION = 2;
 const OPEN_START = 0;
 const OPEN_END = 24 * 60;
@@ -9914,6 +9917,31 @@ let appUsers = [];
 let currentUser = null;
 let appStarted = false;
 let authReady = false;
+
+const cloud = (() => {
+  try {
+    if (!window.EMIRA_SUPABASE_URL || !window.EMIRA_SUPABASE_ANON_KEY) return null;
+    if (!window.supabase?.createClient) {
+      console.error('e-MIRA: pustaka Supabase tidak termuat.');
+      return null;
+    }
+    return window.supabase.createClient(
+      window.EMIRA_SUPABASE_URL,
+      window.EMIRA_SUPABASE_ANON_KEY,
+      { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } }
+    );
+  } catch (error) {
+    console.error('e-MIRA: klien Supabase gagal dibuat.', error);
+    return null;
+  }
+})();
+
+let cloudSyncReady = false;
+let cloudHydrating = false;
+let cloudSaveTimer = null;
+let cloudSaveInFlight = false;
+let cloudLastUpdated = 0;
+let cloudChannel = null;
 
 /* =========================================================
    3. UTILITAS
@@ -10191,43 +10219,44 @@ function seedWorkers() {
   return [];
 }
 
+function normalizeBooking(booking) {
+  if (!booking || !booking.id || !booking.roomId || !booking.date) return null;
+  const participantIds = Array.isArray(booking.participantIds)
+    ? booking.participantIds.filter((id) => typeof id === 'string')
+    : [];
+  const customParticipants = Array.isArray(booking.customParticipants)
+    ? booking.customParticipants
+        .filter((participant) => participant && String(participant.name || '').trim())
+        .map((participant, index) => ({
+          id: String(participant.id || `cp-load-${index}`),
+          name: String(participant.name).slice(0, 60),
+          unit: String(participant.unit || '').slice(0, 50),
+          position: String(participant.position || '').slice(0, 50)
+        }))
+    : [];
+  const rawExternal = Number(booking.externalAttendees);
+  const externalAttendees = Number.isFinite(rawExternal)
+    ? Math.max(0, rawExternal)
+    : Math.max(0, (Number(booking.attendees) || 0) - participantIds.length - customParticipants.length);
+
+  return {
+    ...booking,
+    status: booking.status === 'cancelled' ? 'cancelled' : 'active',
+    notes: booking.notes || '',
+    participantIds,
+    customParticipants,
+    externalAttendees,
+    attendees: Math.max(1, participantIds.length + customParticipants.length + externalAttendees)
+  };
+}
+
 function loadBookings() {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.bookings)) {
-        return parsed.bookings
-          .filter((booking) => booking && booking.id && booking.roomId && booking.date)
-          .map((booking) => {
-            const participantIds = Array.isArray(booking.participantIds)
-              ? booking.participantIds.filter((id) => typeof id === 'string')
-              : [];
-            const customParticipants = Array.isArray(booking.customParticipants)
-              ? booking.customParticipants
-                  .filter((participant) => participant && String(participant.name || '').trim())
-                  .map((participant, index) => ({
-                    id: String(participant.id || `cp-load-${index}`),
-                    name: String(participant.name).slice(0, 60),
-                    unit: String(participant.unit || '').slice(0, 50),
-                    position: String(participant.position || '').slice(0, 50)
-                  }))
-              : [];
-            const rawExternal = Number(booking.externalAttendees);
-            const externalAttendees = Number.isFinite(rawExternal)
-              ? Math.max(0, rawExternal)
-              : Math.max(0, (Number(booking.attendees) || 0) - participantIds.length - customParticipants.length);
-
-            return {
-              ...booking,
-              status: booking.status === 'cancelled' ? 'cancelled' : 'active',
-              notes: booking.notes || '',
-              participantIds,
-              customParticipants,
-              externalAttendees,
-              attendees: Math.max(1, participantIds.length + customParticipants.length + externalAttendees)
-            };
-          });
+        return parsed.bookings.map(normalizeBooking).filter(Boolean);
       }
     }
   } catch (error) {
@@ -10246,6 +10275,7 @@ function persistBookings(list = bookings, silent = false) {
       savedAt: new Date().toISOString(),
       bookings: list
     }));
+    scheduleCloudSave();
     return true;
   } catch (error) {
     console.warn('e-MIRA: data tidak dapat disimpan.', error);
@@ -10275,6 +10305,7 @@ function loadFungsiOptions() {
 function persistFungsiOptions(list = fungsiOptions) {
   try {
     window.localStorage.setItem(FUNGSI_STORAGE_KEY, JSON.stringify(list));
+    scheduleCloudSave();
     return true;
   } catch (error) {
     console.warn('e-MIRA: daftar fungsi tidak dapat disimpan.', error);
@@ -10321,6 +10352,7 @@ function applyRoomOverrides() {
 function persistRoomOverrides() {
   try {
     window.localStorage.setItem(ROOM_OVERRIDES_KEY, JSON.stringify(roomOverrides));
+    scheduleCloudSave();
     return true;
   } catch (error) {
     console.warn('e-MIRA: nama ruangan tidak dapat disimpan.', error);
@@ -10332,6 +10364,7 @@ function persistRoomOverrides() {
 function persistRooms() {
   try {
     window.localStorage.setItem(ROOMS_STORAGE_KEY, JSON.stringify(ROOMS));
+    scheduleCloudSave();
     return true;
   } catch (error) {
     console.warn('e-MIRA: daftar ruangan tidak dapat disimpan.', error);
@@ -10405,6 +10438,7 @@ function persistWorkers(list = workers, silent = false) {
       savedAt: new Date().toISOString(),
       workers: list
     }));
+    scheduleCloudSave();
     return true;
   } catch (error) {
     console.warn('e-MIRA: data pekerja tidak dapat disimpan.', error);
@@ -14027,7 +14061,7 @@ function askDataAction(action) {
   } else {
     config = {
       title: 'Kosongkan Data Pemesanan?',
-      text: 'Seluruh riwayat pemesanan akan dihapus dari perangkat ini. Data pekerja tetap disimpan.',
+      text: 'Seluruh riwayat pemesanan akan dihapus dari cloud dan seluruh perangkat. Data pekerja tetap disimpan.',
       button: 'Ya, Kosongkan',
       summary: `<strong>${bookings.length} pemesanan akan dihapus</strong><span>Data pekerja dan pengaturan notifikasi tidak ikut dihapus.</span>`
     };
@@ -14338,7 +14372,7 @@ function askCancelBooking(bookingId) {
   openModal('confirmModal');
 }
 
-function handleConfirmAction() {
+async function handleConfirmAction() {
   if (state.pendingDataAction === 'delete-booking') {
     const booking = bookings.find((item) => item.id === state.pendingDeleteId);
     const selectedId = state.selectedBookingId;
@@ -14411,13 +14445,28 @@ function handleConfirmAction() {
     state.pendingUserDeleteIds = [];
     state.pendingUserDeleteAll = false;
     state.selectedUserIds = [];
-    appUsers = appUsers.filter((user) => !ids.has(user.id));
-    persistAppUsers();
+
+    if (!cloud) {
+      showToast('Cloud belum siap', 'Akun tidak dapat dinonaktifkan tanpa koneksi Supabase.', 'error');
+      return;
+    }
+
+    const { error } = await cloud
+      .from('profiles')
+      .update({ status: 'inactive' })
+      .in('id', [...ids]);
+    if (error) {
+      console.error('e-MIRA: akun tidak dapat dinonaktifkan.', error);
+      showToast('Akun tidak dapat dinonaktifkan', error.message || 'Periksa koneksi lalu coba lagi.', 'error');
+      return;
+    }
+
+    appUsers = appUsers.map((user) => ids.has(user.id) ? { ...user, status: 'inactive' } : user);
     closeModal('confirmModal');
     renderUsers();
     showToast(
-      all ? 'Akun lain dihapus' : 'Akun dihapus',
-      `${count} akun dihapus. Akun yang sedang aktif tetap dipertahankan.`,
+      all ? 'Akun lain dinonaktifkan' : 'Akun dinonaktifkan',
+      `${count} akun tidak dapat login lagi. Akun yang sedang aktif tetap dipertahankan.`,
       'warning'
     );
     return;
@@ -14689,6 +14738,7 @@ function loadNotificationTemplates() {
 function persistNotificationTemplates() {
   try {
     window.localStorage.setItem(TEMPLATE_STORAGE_KEY, JSON.stringify(notificationTemplates));
+    scheduleCloudSave();
     return true;
   } catch (error) {
     console.warn('e-MIRA: template notifikasi tidak dapat disimpan.', error);
@@ -16611,10 +16661,235 @@ function showLoginAlert(message) {
   alert.innerHTML = message ? `${icon('i-alert')}<span>${esc(message)}</span>` : '';
 }
 
+function authEmailForUsername(username) {
+  return `${String(username || '').trim().toLowerCase()}@emira.local`;
+}
+
+function mapProfileRow(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    username: row.username,
+    name: row.name,
+    email: row.email || '',
+    phone: row.phone || '',
+    unit: row.unit || '',
+    position: row.position || '',
+    role: row.role === 'viewer' ? 'user' : row.role,
+    status: row.status || 'active',
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || row.created_at || new Date().toISOString()
+  };
+}
+
+async function fetchProfileFromCloud(userId) {
+  if (!cloud || !userId) return null;
+  const { data, error } = await cloud
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw error;
+  return mapProfileRow(data);
+}
+
+async function fetchProfilesFromCloud() {
+  if (!cloud) return [];
+  const { data, error } = await cloud
+    .from('profiles')
+    .select('*')
+    .order('name', { ascending: true });
+  if (error) throw error;
+  return (data || []).map(mapProfileRow).filter(Boolean);
+}
+
+function collectCloudState() {
+  return {
+    version: STORAGE_VERSION,
+    savedAt: new Date().toISOString(),
+    bookings,
+    workers,
+    fungsi: fungsiOptions,
+    rooms: ROOMS.map((room) => ({ ...room })),
+    roomOverrides,
+    notificationTemplates
+  };
+}
+
+function applyCloudState(data) {
+  if (!data || typeof data !== 'object') return false;
+
+  if (Array.isArray(data.bookings)) {
+    bookings = data.bookings.map((booking) => {
+      try { return normalizeBooking(booking); } catch (error) { return null; }
+    }).filter(Boolean);
+  }
+  if (Array.isArray(data.workers)) {
+    workers = data.workers.filter((worker) => worker && worker.id && worker.name && worker.employeeNo);
+  }
+  if (Array.isArray(data.fungsi) && data.fungsi.length) {
+    fungsiOptions = [...new Set(data.fungsi.map((item) => String(item || '').trim()).filter(Boolean))];
+  }
+  if (Array.isArray(data.rooms) && data.rooms.length) {
+    const validRooms = data.rooms.filter((room) => room && room.id && room.name && room.fullName && Number(room.capacity) > 0);
+    if (validRooms.length) ROOMS.splice(0, ROOMS.length, ...validRooms);
+  }
+  if (data.roomOverrides && typeof data.roomOverrides === 'object') {
+    roomOverrides = data.roomOverrides;
+    applyRoomOverrides();
+  }
+  if (data.notificationTemplates && typeof data.notificationTemplates === 'object') {
+    notificationTemplates = data.notificationTemplates;
+  }
+
+  populateFormOptions();
+  updateAdminDisplay();
+  renderAll();
+  return true;
+}
+
+function scheduleCloudSave() {
+  if (!cloud || !currentUser || !cloudSyncReady || cloudHydrating) return;
+  window.clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = window.setTimeout(() => {
+    flushCloudState().catch((error) => {
+      console.error('e-MIRA: sinkronisasi cloud gagal.', error);
+      showToast('Sinkronisasi gagal', 'Perubahan tersimpan di perangkat ini, tetapi belum terkirim ke cloud.', 'error');
+    });
+  }, 650);
+}
+
+async function flushCloudState(force = false) {
+  if (!cloud || !currentUser || !cloudSyncReady) return;
+  if (cloudHydrating && !force) return;
+  if (cloudSaveInFlight) {
+    scheduleCloudSave();
+    return;
+  }
+  cloudSaveInFlight = true;
+  try {
+    const { error } = await cloud
+      .from('app_state')
+      .update({ data: collectCloudState(), updated_by: currentUser.id })
+      .eq('id', 'main');
+    if (error) throw error;
+    cloudLastUpdated = Date.now();
+  } finally {
+    cloudSaveInFlight = false;
+  }
+}
+
+function subscribeCloudState() {
+  if (!cloud || cloudChannel) return;
+  cloudChannel = cloud
+    .channel('emira-app-state')
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'app_state',
+      filter: 'id=eq.main'
+    }, (payload) => {
+      const row = payload?.new;
+      const stamp = row?.updated_at ? Date.parse(row.updated_at) : 0;
+      if (!row?.data || (stamp && stamp <= cloudLastUpdated) || cloudHydrating) return;
+      cloudLastUpdated = stamp || Date.now();
+      cloudHydrating = true;
+      try {
+        applyCloudState(row.data);
+      } finally {
+        cloudHydrating = false;
+      }
+      showToast('Data diperbarui', 'Perubahan terbaru dari perangkat lain telah dimuat.', 'info');
+    })
+    .subscribe();
+}
+
+function mergeLocalIntoCloud(remote) {
+  const merged = { ...remote };
+  const remoteBookings = Array.isArray(remote.bookings) ? remote.bookings : [];
+  const remoteBookingIds = new Set(remoteBookings.map((booking) => booking && booking.id).filter(Boolean));
+  const localOnlyBookings = bookings.filter((booking) => booking && booking.id && !remoteBookingIds.has(booking.id));
+  merged.bookings = [...remoteBookings, ...localOnlyBookings];
+
+  const remoteWorkers = Array.isArray(remote.workers) ? remote.workers : [];
+  const remoteWorkerIds = new Set(remoteWorkers.map((worker) => worker && worker.id).filter(Boolean));
+  const localOnlyWorkers = workers.filter((worker) => worker && worker.id && !remoteWorkerIds.has(worker.id));
+  merged.workers = [...remoteWorkers, ...localOnlyWorkers];
+
+  if (!Array.isArray(merged.rooms) || !merged.rooms.length) merged.rooms = ROOMS.map((room) => ({ ...room }));
+  if (!Array.isArray(merged.fungsi) || !merged.fungsi.length) merged.fungsi = [...fungsiOptions];
+  merged.roomOverrides = { ...(roomOverrides || {}), ...(remote.roomOverrides || {}) };
+  merged.notificationTemplates = { ...(notificationTemplates || {}), ...(remote.notificationTemplates || {}) };
+  return merged;
+}
+
+async function hydrateCloudState() {
+  if (!cloud || !currentUser || cloudHydrating) return;
+  cloudHydrating = true;
+  try {
+    const { data, error } = await cloud
+      .from('app_state')
+      .select('data, updated_at')
+      .eq('id', 'main')
+      .maybeSingle();
+    if (error) throw error;
+
+    const remote = data?.data && typeof data.data === 'object' ? data.data : {};
+    const hasRemoteData = Object.keys(remote).length > 0;
+    const hasLocalData = bookings.length > 0 || workers.length > 0 || Object.keys(roomOverrides || {}).length > 0;
+    const firstMigration = !window.localStorage.getItem(CLOUD_MIGRATION_KEY);
+
+    if (hasRemoteData) {
+      const merged = firstMigration && hasLocalData ? mergeLocalIntoCloud(remote) : remote;
+      applyCloudState(merged);
+      cloudLastUpdated = data.updated_at ? Date.parse(data.updated_at) : Date.now();
+      cloudSyncReady = true;
+      if (firstMigration && hasLocalData) {
+        await flushCloudState(true);
+        window.localStorage.setItem(CLOUD_MIGRATION_KEY, new Date().toISOString());
+        showToast('Data digabungkan', 'Data lokal dan data cloud berhasil digabungkan.', 'success');
+      } else {
+        showToast('Data cloud dimuat', 'Data e-MIRA tersinkron dengan perangkat lain.', 'info');
+      }
+      window.localStorage.setItem(CLOUD_MIGRATION_KEY, new Date().toISOString());
+      subscribeCloudState();
+      return;
+    }
+
+    cloudSyncReady = true;
+    if (hasLocalData) {
+      await flushCloudState(true);
+      window.localStorage.setItem(CLOUD_MIGRATION_KEY, new Date().toISOString());
+      showToast('Data lokal diunggah', 'Data e-MIRA dari perangkat ini sudah masuk ke cloud.', 'success');
+    }
+    subscribeCloudState();
+  } catch (error) {
+    console.error('e-MIRA: data cloud tidak dapat dimuat.', error);
+    cloudSyncReady = false;
+    showToast('Cloud belum tersambung', 'Aplikasi memakai data lokal. Periksa koneksi lalu muat ulang.', 'warning');
+  } finally {
+    cloudHydrating = false;
+  }
+}
+
+function teardownCloudSync() {
+  cloudSyncReady = false;
+  window.clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = null;
+  if (cloudChannel) {
+    try { cloud.removeChannel(cloudChannel); } catch (error) { /* abaikan */ }
+    cloudChannel = null;
+  }
+}
+
 async function handleLogin(event) {
   event.preventDefault();
   if (!authReady) {
     showLoginAlert('Sistem sedang memuat akun. Tunggu sebentar lalu coba lagi.');
+    return;
+  }
+  if (!cloud) {
+    showLoginAlert('Koneksi Supabase belum siap. Periksa konfigurasi lalu muat ulang.');
     return;
   }
 
@@ -16630,54 +16905,70 @@ async function handleLogin(event) {
   submit && (submit.disabled = true);
   showLoginAlert('');
 
-  const user = appUsers.find((item) => String(item.username).toLowerCase() === username);
-  if (!user) {
-    showLoginAlert('Username atau password tidak sesuai.');
+  try {
+    const { data: authData, error: authError } = await cloud.auth.signInWithPassword({
+      email: authEmailForUsername(username),
+      password
+    });
+    if (authError || !authData?.user) {
+      showLoginAlert('Username atau password tidak sesuai.');
+      document.getElementById('loginPassword')?.select();
+      return;
+    }
+
+    let profile = null;
+    try {
+      profile = await fetchProfileFromCloud(authData.user.id);
+    } catch (error) {
+      console.error('e-MIRA: profil tidak dapat dibaca.', error);
+      await cloud.auth.signOut();
+      showLoginAlert('Profil akun tidak dapat dibaca. Hubungi Super User.');
+      return;
+    }
+
+    if (!profile) {
+      await cloud.auth.signOut();
+      showLoginAlert('Profil akun belum tersedia. Hubungi Super User.');
+      return;
+    }
+    if (profile.status !== 'active') {
+      await cloud.auth.signOut();
+      showLoginAlert('Akun ini nonaktif. Hubungi admin e-MIRA.');
+      return;
+    }
+
+    currentUser = profile;
+    try {
+      appUsers = await fetchProfilesFromCloud();
+    } catch (error) {
+      console.warn('e-MIRA: daftar profil tidak dapat dimuat.', error);
+      appUsers = [profile];
+    }
+
+    showLoginAlert('');
+    await startApp();
+    showToast('Selamat datang', `${profile.name} masuk sebagai ${roleLabel(profile.role)}.`, 'success');
+  } catch (error) {
+    console.error('e-MIRA: login gagal.', error);
+    showLoginAlert('Tidak dapat terhubung ke server autentikasi. Periksa koneksi internet.');
+  } finally {
     submit && (submit.disabled = false);
-    return;
   }
-
-  const hashed = await hashPassword(password, user.salt, user.hashAlgo || 'auto');
-  if (hashed.hash !== user.passwordHash) {
-    showLoginAlert('Username atau password tidak sesuai.');
-    document.getElementById('loginPassword')?.select();
-    submit && (submit.disabled = false);
-    return;
-  }
-
-  if (user.status !== 'active') {
-    showLoginAlert('Akun ini nonaktif. Hubungi admin e-MIRA.');
-    submit && (submit.disabled = false);
-    return;
-  }
-
-  if (!user.passwordVault) {
-    user.passwordVault = await encryptPasswordValue(password);
-    appUsers = appUsers.map((item) => item.id === user.id ? user : item);
-    persistAppUsers();
-  }
-
-  currentUser = user;
-  setSessionUser(user.id);
-  showLoginAlert('');
-  startApp();
-  submit && (submit.disabled = false);
-  showToast('Selamat datang', `${user.name} masuk sebagai ${roleLabel(user.role)}.`, 'success');
 }
 
-function logout() {
-  clearSessionUser();
+async function logout() {
+  teardownCloudSync();
+  try {
+    await cloud?.auth.signOut();
+  } catch (error) {
+    console.warn('e-MIRA: sesi cloud tidak dapat ditutup.', error);
+  }
   currentUser = null;
   closeAllModals();
-  state.route = 'ringkasan';
-  if (window.location.hash !== '#ringkasan') {
-    window.history.replaceState(null, '', '#ringkasan');
-  }
   showLogin('Anda telah keluar dari e-MIRA.');
 }
 
-function startApp() {
-  showApp();
+async function startApp() {
   if (!appStarted) {
     appStarted = true;
     initialize();
@@ -16688,7 +16979,11 @@ function startApp() {
     renderAll();
     applyRoute();
   }
+  await hydrateCloudState();
+  showApp();
+  updateAdminDisplay();
   applyRolePermissions();
+  applyRoute();
 }
 
 function loadHomePageUrl() {
@@ -17173,9 +17468,9 @@ function openMyAccountModal() {
   window.setTimeout(() => document.getElementById('myAccountName')?.focus(), 80);
 }
 
-function saveMyAccount(event) {
+async function saveMyAccount(event) {
   event.preventDefault();
-  if (!currentUser) return;
+  if (!currentUser || !cloud) return;
 
   const name = document.getElementById('myAccountName')?.value.trim() || '';
   const email = document.getElementById('myAccountEmail')?.value.trim().toLowerCase() || '';
@@ -17187,6 +17482,10 @@ function saveMyAccount(event) {
   const errors = [];
 
   document.querySelectorAll('#myAccountForm .invalid').forEach((element) => element.classList.remove('invalid'));
+  if (alert) {
+    alert.hidden = true;
+    alert.textContent = '';
+  }
   if (name.length < 3) errors.push({ field: 'myAccountName', message: 'Nama lengkap minimal 3 karakter.' });
   if (email && !isValidEmail(email)) errors.push({ field: 'myAccountEmail', message: 'Format email tidak valid.' });
   if (!rawPhone) errors.push({ field: 'myAccountPhone', message: 'Nomor HP wajib diisi.' });
@@ -17201,29 +17500,44 @@ function saveMyAccount(event) {
     return;
   }
 
-  currentUser = {
-    ...currentUser,
-    name,
-    email,
-    phone,
-    unit,
-    position,
-    updatedAt: new Date().toISOString()
-  };
-  appUsers = appUsers.map((user) => user.id === currentUser.id ? currentUser : user);
-  persistAppUsers();
-  if (currentUser.role !== 'superuser') {
-    adminProfile = loadAdminProfile();
+  try {
+    const { data, error } = await cloud
+      .from('profiles')
+      .update({
+        name,
+        email: email || null,
+        phone: phone || null,
+        unit,
+        position
+      })
+      .eq('id', currentUser.id)
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    const updated = mapProfileRow(data);
+    if (!updated) throw new Error('Profil tidak ditemukan setelah disimpan.');
+
+    currentUser = updated;
+    appUsers = appUsers.map((user) => (user.id === updated.id ? updated : user));
+    if (currentUser.role !== 'superuser') {
+      adminProfile = loadAdminProfile();
+    }
+    updateAdminDisplay();
+    renderMyAccount();
+    closeModal('myAccountModal');
+    showToast('Data akun disimpan', 'Data akun berhasil diperbarui.');
+  } catch (error) {
+    console.error('e-MIRA: data akun tidak dapat disimpan.', error);
+    if (alert) {
+      alert.hidden = false;
+      alert.innerHTML = `<strong>Data akun tidak tersimpan.</strong><br>${esc(error.message || 'Periksa koneksi lalu coba lagi.')}`;
+    }
   }
-  updateAdminDisplay();
-  renderMyAccount();
-  closeModal('myAccountModal');
-  showToast('Data akun disimpan', 'Data akun berhasil diperbarui.');
 }
 
 async function changeMyPassword(event) {
   event.preventDefault();
-  if (!currentUser) return;
+  if (!currentUser || !cloud) return;
 
   const current = document.getElementById('currentPassword')?.value || '';
   const next = document.getElementById('newPassword')?.value || '';
@@ -17247,31 +17561,33 @@ async function changeMyPassword(event) {
     return;
   }
 
-  const verified = await hashPassword(current, currentUser.salt, currentUser.hashAlgo || 'auto');
-  if (verified.hash !== currentUser.passwordHash) {
+  try {
+    const { error: verifyError } = await cloud.auth.signInWithPassword({
+      email: authEmailForUsername(currentUser.username),
+      password: current
+    });
+    if (verifyError) {
+      if (alert) {
+        alert.hidden = false;
+        alert.innerHTML = '<strong>Password saat ini tidak sesuai.</strong>';
+      }
+      document.getElementById('currentPassword')?.select();
+      return;
+    }
+
+    const { error: updateError } = await cloud.auth.updateUser({ password: next });
+    if (updateError) throw updateError;
+
+    document.getElementById('myPasswordForm')?.reset();
+    renderMyAccount();
+    showToast('Password diperbarui', 'Gunakan password baru pada proses login berikutnya.');
+  } catch (error) {
+    console.error('e-MIRA: password tidak dapat diperbarui.', error);
     if (alert) {
       alert.hidden = false;
-      alert.innerHTML = '<strong>Password saat ini tidak sesuai.</strong>';
+      alert.innerHTML = `<strong>Password tidak dapat diperbarui.</strong><br>${esc(error.message || 'Periksa koneksi lalu coba lagi.')}`;
     }
-    document.getElementById('currentPassword')?.select();
-    return;
   }
-
-  const salt = randomSalt();
-  const hashed = await hashPassword(next, salt);
-  currentUser = {
-    ...currentUser,
-    salt,
-    passwordHash: hashed.hash,
-    hashAlgo: hashed.algorithm,
-    passwordVault: await encryptPasswordValue(next),
-    updatedAt: new Date().toISOString()
-  };
-  appUsers = appUsers.map((user) => user.id === currentUser.id ? currentUser : user);
-  persistAppUsers();
-  document.getElementById('myPasswordForm')?.reset();
-  renderMyAccount();
-  showToast('Password diperbarui', 'Gunakan password baru pada proses login berikutnya.');
 }
 
 function renderUsers() {
@@ -17305,7 +17621,6 @@ function renderUsers() {
           ${superUser ? '<th class="worker-check-cell"><input type="checkbox" id="userSelectAll" aria-label="Pilih semua akun lain"></th>' : ''}
           <th>Nama</th>
           <th>Username</th>
-          ${superUser ? '<th>Password</th>' : ''}
           <th>Tipe</th>
           <th>Status</th>
           <th>Diperbarui</th>
@@ -17326,12 +17641,6 @@ function renderUsers() {
                 ${user.email ? `<span class="user-contact">${esc(user.email)}</span>` : ''}
               </td>
               <td>${esc(user.username)}</td>
-              ${superUser ? `
-              <td class="password-cell">
-                ${user.passwordVault
-                  ? `<span class="password-value" data-password-value="${esc(user.id)}">••••••</span><button type="button" class="password-reveal" data-reveal-password="${esc(user.id)}" title="Tampilkan password" aria-label="Tampilkan password ${esc(user.name)}">${icon('i-eye')}</button>`
-                  : '<span class="password-value is-unavailable">Tidak tersedia</span>'}
-              </td>` : ''}
               <td><span class="role-badge is-${user.role}">${esc(roleLabel(user.role))}</span></td>
               <td><span class="user-status is-${user.status}">${user.status === 'active' ? 'Aktif' : 'Nonaktif'}</span></td>
               <td>${esc(formatDateTime(user.updatedAt || user.createdAt))}</td>
@@ -17339,7 +17648,7 @@ function renderUsers() {
               <td class="align-right">
                 <div class="user-table-actions">
                   <button type="button" class="btn btn-ghost btn-sm" data-edit-user="${esc(user.id)}">Edit</button>
-                  <button type="button" class="btn btn-ghost btn-sm" data-delete-user="${esc(user.id)}" ${isSelf ? 'disabled title="Akun yang sedang aktif tidak dapat dihapus"' : ''}>Hapus</button>
+                  <button type="button" class="btn btn-ghost btn-sm" data-delete-user="${esc(user.id)}" ${isSelf ? 'disabled title="Akun yang sedang aktif tidak dapat dihapus"' : ''}>Nonaktifkan</button>
                 </div>
               </td>` : ''}
             </tr>
@@ -17407,10 +17716,10 @@ function askDeleteAccounts(ids, all = false) {
   const text = document.getElementById('confirmText');
   const summary = document.getElementById('confirmSummary');
   const button = document.getElementById('confirmCancelBtn');
-  if (title) title.textContent = all ? 'Hapus Seluruh Akun Lain?' : 'Hapus Akun?';
-  if (text) text.textContent = 'Akun yang dihapus tidak dapat masuk lagi ke e-MIRA. Akun yang sedang aktif tetap dipertahankan.';
-  if (summary) summary.innerHTML = `<strong>${targets.length} akun akan dihapus</strong><span>Akun yang sedang aktif tidak termasuk.</span>`;
-  if (button) button.textContent = 'Ya, Hapus Akun';
+  if (title) title.textContent = all ? 'Nonaktifkan Seluruh Akun Lain?' : 'Nonaktifkan Akun?';
+  if (text) text.textContent = 'Akun yang dinonaktifkan tidak dapat masuk lagi ke e-MIRA. Profil tetap disimpan dan dapat diaktifkan kembali oleh Super User.';
+  if (summary) summary.innerHTML = `<strong>${targets.length} akun akan dinonaktifkan</strong><span>Akun yang sedang aktif tidak termasuk.</span>`;
+  if (button) button.textContent = 'Ya, Nonaktifkan Akun';
   openModal('confirmModal');
 }
 
@@ -17491,17 +17800,34 @@ function openUserModal(userId = '') {
   const confirmLabel = document.getElementById('userPasswordConfirmLabel');
   const passwordInput = document.getElementById('userPassword');
   const confirmInput = document.getElementById('userPasswordConfirm');
+  const passwordField = document.getElementById('userPasswordField');
+  const confirmField = document.getElementById('userPasswordConfirmField');
   const roleField = document.getElementById('userRoleField');
+  const usernameInput = document.getElementById('userUsername');
   if (roleField) roleField.hidden = !superUser;
+  if (usernameInput) {
+    usernameInput.disabled = isEdit;
+    usernameInput.title = isEdit ? 'Username tidak dapat diubah setelah akun dibuat.' : '';
+  }
+  if (passwordField) passwordField.hidden = isEdit;
+  if (confirmField) confirmField.hidden = isEdit;
   if (title) title.textContent = isEdit ? 'Edit Akun' : 'Akun Baru';
   if (eyebrow) eyebrow.textContent = isEdit ? 'EDIT AKUN' : 'TAMBAH AKUN';
   const modalNote = document.getElementById('userModalNote');
-  if (modalNote) modalNote.textContent = superUser ? 'Akun e-MIRA' : 'Admin hanya dapat menambah akun User.';
-  if (passwordLabel) passwordLabel.innerHTML = isEdit ? 'Password <span class="optional">(opsional)</span>' : 'Password <span class="required">*</span>';
-  if (confirmLabel) confirmLabel.innerHTML = isEdit ? 'Konfirmasi password <span class="optional">(opsional)</span>' : 'Konfirmasi password <span class="required">*</span>';
-  if (passwordInput) passwordInput.placeholder = isEdit ? 'Kosongkan jika tidak diubah' : 'Masukkan password minimal 6 karakter';
-  if (confirmInput) confirmInput.placeholder = isEdit ? 'Ulangi password baru (opsional)' : 'Ulangi password';
-  if (note) note.textContent = isEdit ? 'Kosongkan bila password tidak diubah. Minimal 6 karakter.' : 'Wajib diisi untuk akun baru. Minimal 6 karakter.';
+  if (modalNote) modalNote.textContent = isEdit
+    ? 'Password dikelola pengguna melalui menu Akun Saya.'
+    : (superUser ? 'Akun e-MIRA' : 'Admin hanya dapat menambah akun User.');
+  if (passwordLabel) passwordLabel.innerHTML = 'Password <span class="required">*</span>';
+  if (confirmLabel) confirmLabel.innerHTML = 'Konfirmasi password <span class="required">*</span>';
+  if (passwordInput) {
+    passwordInput.placeholder = 'Masukkan password minimal 6 karakter';
+    passwordInput.disabled = isEdit;
+  }
+  if (confirmInput) {
+    confirmInput.placeholder = 'Ulangi password';
+    confirmInput.disabled = isEdit;
+  }
+  if (note) note.textContent = 'Wajib diisi untuk akun baru. Minimal 6 karakter.';
 
   openModal('userModal');
   window.setTimeout(() => document.getElementById('userName')?.focus(), 80);
@@ -17509,19 +17835,28 @@ function openUserModal(userId = '') {
 
 async function saveUser(event) {
   event.preventDefault();
+  if (!cloud) {
+    showToast('Cloud belum siap', 'Tidak dapat menyimpan akun tanpa koneksi Supabase.', 'error');
+    return;
+  }
+
   const id = document.getElementById('userId')?.value || '';
   const superUser = isSuperUser();
+  const canCreate = superUser || isAdmin();
   if (id && !superUser) {
     showToast('Akses terbatas', 'Hanya Super User yang dapat mengubah akun.', 'warning');
     return;
   }
-  if (!id && !superUser && !isAdmin()) {
+  if (!id && !canCreate) {
     showToast('Akses terbatas', 'Anda tidak memiliki akses untuk menambah akun.', 'warning');
     return;
   }
 
+  const existing = appUsers.find((user) => user.id === id) || null;
   const name = document.getElementById('userName')?.value.trim() || '';
-  const username = document.getElementById('userUsername')?.value.trim().toLowerCase() || '';
+  const username = existing
+    ? String(existing.username || '')
+    : (document.getElementById('userUsername')?.value.trim().toLowerCase() || '');
   const email = document.getElementById('userEmail')?.value.trim().toLowerCase() || '';
   const rawPhone = document.getElementById('userPhone')?.value.trim() || '';
   const phone = normalizePhone(rawPhone);
@@ -17532,17 +17867,27 @@ async function saveUser(event) {
   const status = document.getElementById('userStatus')?.value || 'active';
   const rawPassword = document.getElementById('userPassword')?.value || '';
   const confirm = document.getElementById('userPasswordConfirm')?.value || '';
-  const existing = appUsers.find((user) => user.id === id) || null;
-  const password = rawPassword;
   const errors = [];
+  const alert = document.getElementById('userFormAlert');
+
+  const showErrors = (messages) => {
+    if (alert) {
+      alert.hidden = false;
+      alert.innerHTML = `<strong>Periksa akun:</strong><br>${messages.map((message) => `• ${esc(message)}`).join('<br>')}`;
+    }
+  };
 
   document.querySelectorAll('#userForm .invalid').forEach((element) => element.classList.remove('invalid'));
+  if (alert) {
+    alert.hidden = true;
+    alert.textContent = '';
+  }
 
   if (name.length < 3) errors.push({ field: 'userName', message: 'Nama lengkap minimal 3 karakter.' });
-  if (!/^[a-z0-9._-]{4,30}$/.test(username)) {
+  if (!existing && !/^[a-z0-9._-]{4,30}$/.test(username)) {
     errors.push({ field: 'userUsername', message: 'Username 4–30 karakter: huruf kecil, angka, titik, strip, atau garis bawah.' });
   }
-  if (appUsers.some((user) => user.id !== id && String(user.username).toLowerCase() === username)) {
+  if (!existing && appUsers.some((user) => String(user.username).toLowerCase() === username)) {
     errors.push({ field: 'userUsername', message: 'Username sudah digunakan akun lain.' });
   }
   if (!['superuser', 'admin', 'user'].includes(role)) {
@@ -17556,88 +17901,125 @@ async function saveUser(event) {
   } else if (phone.length < 10 || phone.length > 15) {
     errors.push({ field: 'userPhone', message: 'Nomor HP tidak valid.' });
   }
-  if (!existing && !password) {
+  if (!existing && !rawPassword) {
     errors.push({ field: 'userPassword', message: 'Password wajib diisi untuk akun baru.' });
   }
-  if (password && password.length < 6) errors.push({ field: 'userPassword', message: 'Password minimal 6 karakter.' });
+  if (!existing && rawPassword && rawPassword.length < 6) {
+    errors.push({ field: 'userPassword', message: 'Password minimal 6 karakter.' });
+  }
   if (!existing && !confirm) {
     errors.push({ field: 'userPasswordConfirm', message: 'Konfirmasi password wajib diisi.' });
   }
-  if (!password && confirm) {
-    errors.push({ field: 'userPassword', message: 'Isi password terlebih dahulu atau kosongkan konfirmasi.' });
+  if (!existing && rawPassword && confirm && rawPassword !== confirm) {
+    errors.push({ field: 'userPasswordConfirm', message: 'Konfirmasi password tidak sama.' });
   }
-  if (password && password !== confirm) errors.push({ field: 'userPasswordConfirm', message: 'Konfirmasi password tidak sama.' });
 
-  if (existing && existing.role === 'superuser' && existing.status === 'active') {
-    const otherSupers = appUsers.filter((user) => user.id !== existing.id && user.role === 'superuser' && user.status === 'active');
-    if (!otherSupers.length && (role !== 'superuser' || status !== 'active')) {
+  if (existing && existing.role === 'superuser' && (role !== 'superuser' || status !== 'active')) {
+    const otherSupers = appUsers.filter((user) => (
+      user.id !== existing.id && user.role === 'superuser' && user.status === 'active'
+    ));
+    if (!otherSupers.length) {
       errors.push({ field: 'userRole', message: 'Minimal harus ada satu Super User aktif.' });
     }
-  }
-  if (existing?.id === currentUser?.id && status === 'inactive') {
-    errors.push({ field: 'userStatus', message: 'Anda tidak dapat menonaktifkan akun yang sedang digunakan.' });
   }
 
   if (errors.length) {
     errors.forEach((error) => document.getElementById(error.field)?.classList.add('invalid'));
-    const alert = document.getElementById('userFormAlert');
-    if (alert) {
-      alert.hidden = false;
-      alert.innerHTML = `<strong>Periksa akun:</strong><br>${errors.map((error) => `• ${esc(error.message)}`).join('<br>')}`;
-    }
-    document.getElementById(errors[0].field)?.focus();
+    showErrors(errors.map((error) => error.message));
     return;
   }
 
-  const now = new Date().toISOString();
-  let savedUser;
+  try {
+    if (existing) {
+      // Username = identitas Auth (email internal), jadi tidak diubah di sini.
+      const { data, error } = await cloud
+        .from('profiles')
+        .update({
+          name,
+          email: email || null,
+          phone: phone || null,
+          unit,
+          position,
+          role,
+          status
+        })
+        .eq('id', existing.id)
+        .select('*')
+        .maybeSingle();
+      if (error) throw error;
+      const updated = mapProfileRow(data);
+      if (!updated) throw new Error('Profil tidak ditemukan setelah disimpan.');
 
-  if (existing) {
-    savedUser = { ...existing, name, username, email, phone, unit, position, role, status, updatedAt: now };
-    if (password) {
-      const salt = randomSalt();
-      const hashed = await hashPassword(password, salt);
-      savedUser.salt = salt;
-      savedUser.passwordHash = hashed.hash;
-      savedUser.hashAlgo = hashed.algorithm;
-      savedUser.passwordVault = await encryptPasswordValue(password);
+      appUsers = appUsers.map((user) => (user.id === updated.id ? updated : user));
+      if (currentUser?.id === updated.id) {
+        currentUser = updated;
+        updateAdminDisplay();
+        applyRolePermissions();
+      }
+      closeModal('userModal');
+      renderUsers();
+      showToast('Akun disimpan', `${updated.name} · ${roleLabel(updated.role)}.`);
+      return;
     }
-  } else {
-    const salt = randomSalt();
-    const hashed = await hashPassword(password, salt);
-    savedUser = {
-      id: `usr-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+
+    // Akun baru: buat invite, lalu daftarkan user Auth lewat klien sementara.
+    const authEmail = authEmailForUsername(username);
+    const { error: inviteError } = await cloud.from('account_invites').insert({
+      auth_email: authEmail,
+      email: email || null,
       username,
       name,
-      email,
-      phone,
+      phone: phone || null,
       unit,
       position,
       role,
-      status,
-      salt,
-      passwordHash: hashed.hash,
-      hashAlgo: hashed.algorithm,
-      passwordVault: await encryptPasswordValue(password),
-      createdAt: now,
-      updatedAt: now
-    };
+      invited_by: currentUser?.id || null
+    });
+    if (inviteError) {
+      throw new Error(inviteError.message || 'Undangan akun tidak dapat dibuat.');
+    }
+
+    let signUpError = null;
+    try {
+      const tempClient = window.supabase.createClient(
+        window.EMIRA_SUPABASE_URL,
+        window.EMIRA_SUPABASE_ANON_KEY,
+        {
+          auth: {
+            persistSession: false,
+            autoRefreshToken: false,
+            detectSessionInUrl: false,
+            storageKey: `emira-invite-${Date.now()}`
+          }
+        }
+      );
+      const { data: signUpData, error } = await tempClient.auth.signUp({
+        email: authEmail,
+        password: rawPassword
+      });
+      signUpError = error || (!signUpData?.user ? new Error('Akun Auth tidak terbentuk.') : null);
+      try { await tempClient.auth.signOut(); } catch (error) { /* abaikan */ }
+    } catch (error) {
+      signUpError = error;
+    }
+
+    if (signUpError) {
+      await cloud.from('account_invites').delete().eq('auth_email', authEmail);
+      throw signUpError;
+    }
+
+    try {
+      appUsers = await fetchProfilesFromCloud();
+    } catch (error) {
+      console.warn('e-MIRA: profil baru belum dapat dimuat.', error);
+    }
+    closeModal('userModal');
+    renderUsers();
+    showToast('Akun dibuat', `${name} dapat login memakai username ${username}.`);
+  } catch (error) {
+    console.error('e-MIRA: akun tidak dapat disimpan.', error);
+    showErrors([error.message || 'Akun tidak dapat disimpan. Periksa koneksi dan coba lagi.']);
   }
-
-  appUsers = existing
-    ? appUsers.map((user) => (user.id === existing.id ? savedUser : user))
-    : [...appUsers, savedUser];
-  persistAppUsers();
-
-  if (savedUser.id === currentUser?.id) {
-    currentUser = savedUser;
-    updateAdminDisplay();
-    applyRolePermissions();
-  }
-
-  closeModal('userModal');
-  renderUsers();
-  showToast('Akun disimpan', `${savedUser.name} · ${roleLabel(savedUser.role)}.`);
 }
 
 function bindLoginEvents() {
@@ -17697,20 +18079,36 @@ function bindLoginEvents() {
 }
 
 async function bootstrapAuth() {
-  appUsers = loadAppUsers();
-  if (!appUsers.length) {
-    await seedDefaultUsers();
+  authReady = false;
+  if (!cloud) {
+    authReady = true;
+    showLogin('Konfigurasi Supabase belum tersedia. Periksa koneksi lalu muat ulang.');
+    return;
   }
-  authReady = true;
 
-  const sessionUserId = getSessionUserId();
-  const sessionUser = appUsers.find((user) => user.id === sessionUserId && user.status === 'active');
-  if (sessionUser) {
-    currentUser = sessionUser;
-    startApp();
-  } else {
-    clearSessionUser();
+  try {
+    const { data: { session } } = await cloud.auth.getSession();
+    authReady = true;
+    if (session?.user) {
+      const profile = await fetchProfileFromCloud(session.user.id);
+      if (profile && profile.status === 'active') {
+        currentUser = profile;
+        try {
+          appUsers = await fetchProfilesFromCloud();
+        } catch (error) {
+          console.warn('e-MIRA: daftar profil tidak dapat dimuat.', error);
+          appUsers = [profile];
+        }
+        await startApp();
+        return;
+      }
+      await cloud.auth.signOut();
+    }
     showLogin();
+  } catch (error) {
+    authReady = true;
+    console.error('e-MIRA: autentikasi cloud gagal dimuat.', error);
+    showLogin('Tidak dapat terhubung ke server autentikasi. Periksa koneksi internet.');
   }
 }
 
@@ -17759,6 +18157,7 @@ function initialize() {
     if (document.querySelector('.modal-backdrop.open')) return;
     renderAll();
   }, 60_000);
+
 }
 
 function prepareLaunchData() {
