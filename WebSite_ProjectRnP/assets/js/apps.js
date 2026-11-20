@@ -24,11 +24,11 @@ window.PROJECT_RP_APPS = [
     id: "e-mira",
     name: "e-MIRA",
     subtitle: "e-lektronik Manajemen Informasi Ruang & Agenda",
-    description: "Kelola jadwal ruang rapat, pemesanan, dan agenda kegiatan Fungsi Project R&P Cilacap dalam satu aplikasi terintegrasi.",
+    description: "Kelola jadwal ruang rapat, pemesanan 24 jam, dan agenda kegiatan Fungsi Project R&P Cilacap dalam satu aplikasi terintegrasi.",
     category: "Manajemen ruang & agenda",
     icon: "meeting",
     href: "apps/e-mira/index.html",
-    tags: ["Jadwal ruang", "Agenda", "Notifikasi"],
+    tags: ["Jadwal ruang", "Agenda", "Pemesanan 24 jam"],
     note: "Akses internal",
   },
   {
